@@ -91,11 +91,37 @@ namespace CryingSnow.FastFoodRush
         {
             // Find or create window components
             if (financeWindow == null)
+            {
                 financeWindow = FindObjectOfType<FinanceWindow>();
+                if (financeWindow == null)
+                {
+                    GameObject financeGO = new GameObject("FinanceWindow");
+                    financeGO.transform.SetParent(this.transform);
+                    financeWindow = financeGO.AddComponent<FinanceWindow>();
+                }
+            }
+            
             if (dealerWindow == null)
+            {
                 dealerWindow = FindObjectOfType<DealerWindow>();
+                if (dealerWindow == null)
+                {
+                    GameObject dealerGO = new GameObject("DealerWindow");
+                    dealerGO.transform.SetParent(this.transform);
+                    dealerWindow = dealerGO.AddComponent<DealerWindow>();
+                }
+            }
+            
             if (casinoWindow == null)
+            {
                 casinoWindow = FindObjectOfType<CasinoWindow>();
+                if (casinoWindow == null)
+                {
+                    GameObject casinoGO = new GameObject("CasinoWindow");
+                    casinoGO.transform.SetParent(this.transform);
+                    casinoWindow = casinoGO.AddComponent<CasinoWindow>();
+                }
+            }
                 
             // Initialize each window
             if (financeWindow != null)
