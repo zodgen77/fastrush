@@ -517,7 +517,7 @@ namespace CryingSnow.FastFoodRush
         {
             scrollPosition = GUI.BeginScrollView(contentRect, scrollPosition, 
                 new Rect(0, 0, contentRect.width - 20 * scaleFactor, dealers.Count * 200 * scaleFactor), 
-                false, true, GUIStyle.none, GUI.skin.verticalScrollbar, scrollViewStyle);
+                false, true, GUIStyle.none, GUI.skin.verticalScrollbar);
             
             float yPos = 10 * scaleFactor;
             
@@ -621,7 +621,7 @@ namespace CryingSnow.FastFoodRush
                 new Rect(contentRect.x, contentRect.y + 40 * scaleFactor, contentRect.width, contentRect.height - 40 * scaleFactor), 
                 scrollPosition, 
                 new Rect(0, 0, contentRect.width - 20 * scaleFactor, activityReports.Count * 80 * scaleFactor), 
-                false, true, GUIStyle.none, GUI.skin.verticalScrollbar, scrollViewStyle);
+                false, true, GUIStyle.none, GUI.skin.verticalScrollbar);
             
             float yPos = 10 * scaleFactor;
             
@@ -682,7 +682,7 @@ namespace CryingSnow.FastFoodRush
         {
             scrollPosition = GUI.BeginScrollView(contentRect, scrollPosition, 
                 new Rect(0, 0, contentRect.width - 20 * scaleFactor, investments.Count * 120 * scaleFactor), 
-                false, true, GUIStyle.none, GUI.skin.verticalScrollbar, scrollViewStyle);
+                false, true, GUIStyle.none, GUI.skin.verticalScrollbar);
             
             float yPos = 10 * scaleFactor;
             
@@ -786,7 +786,7 @@ namespace CryingSnow.FastFoodRush
                 new Rect(contentRect.x, contentRect.y + 40 * scaleFactor, contentRect.width, contentRect.height - 40 * scaleFactor), 
                 scrollPosition, 
                 new Rect(0, 0, contentRect.width - 20 * scaleFactor, legalServices.Count * 100 * scaleFactor), 
-                false, true, GUIStyle.none, GUI.skin.verticalScrollbar, scrollViewStyle);
+                false, true, GUIStyle.none, GUI.skin.verticalScrollbar);
             
             float yPos = 10 * scaleFactor;
             

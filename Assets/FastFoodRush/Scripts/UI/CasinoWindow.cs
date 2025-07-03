@@ -300,7 +300,7 @@ namespace CryingSnow.FastFoodRush
         {
             scrollPosition = GUI.BeginScrollView(contentRect, scrollPosition, 
                 new Rect(0, 0, contentRect.width - 20 * scaleFactor, casinoGames.Count * 100 * scaleFactor), 
-                false, true, GUIStyle.none, GUI.skin.verticalScrollbar, scrollViewStyle);
+                false, true, GUIStyle.none, GUI.skin.verticalScrollbar);
             
             float yPos = 10 * scaleFactor;
             
@@ -516,7 +516,7 @@ namespace CryingSnow.FastFoodRush
         {
             historyScrollPosition = GUI.BeginScrollView(contentRect, historyScrollPosition, 
                 new Rect(0, 0, contentRect.width - 20 * scaleFactor, betHistory.Count * 60 * scaleFactor), 
-                false, true, GUIStyle.none, GUI.skin.verticalScrollbar, scrollViewStyle);
+                false, true, GUIStyle.none, GUI.skin.verticalScrollbar);
             
             float yPos = 10 * scaleFactor;
             
