@@ -99,6 +99,7 @@ namespace CryingSnow.FastFoodRush
         private GUIStyle scrollViewStyle;
         private GUIStyle headerStyle;
         private GUIStyle warningStyle;
+        private bool stylesInitialized = false;
         
         // Scrolling
         private Vector2 scrollPosition = Vector2.zero;
@@ -112,8 +113,11 @@ namespace CryingSnow.FastFoodRush
         // Business stats
         private float totalRevenue = 125000f;
         private float totalExpenses = 78000f;
-        private float currentCash = 45000f;
         private float heatLevel = 35f; // Police attention level
+        
+        // Property to access centralized money system
+        private long CurrentCash => RestaurantManager.Instance.GetMoney();
+        private string FormattedCash => RestaurantManager.Instance.GetFormattedMoney(CurrentCash);
         
         public void Initialize(Rect screenRect, float scale)
         {
@@ -127,7 +131,7 @@ namespace CryingSnow.FastFoodRush
                 screenRect.height - 160 * scaleFactor
             );
             
-            SetupStyles();
+            // Note: SetupStyles() moved to DrawWindow() to avoid GUI access errors
             GenerateDealers();
             GenerateActivityReports();
             GenerateInvestments();
@@ -136,9 +140,9 @@ namespace CryingSnow.FastFoodRush
         
         private void SetupStyles()
         {
-            // Tab style
+            // Tab style - Optimized font size
             tabStyle = new GUIStyle(GUI.skin.button);
-            tabStyle.fontSize = Mathf.RoundToInt(14 * scaleFactor);
+            tabStyle.fontSize = Mathf.RoundToInt(12 * scaleFactor);
             tabStyle.fontStyle = FontStyle.Bold;
             tabStyle.normal.textColor = Color.white;
             tabStyle.normal.background = MakeTexture(new Color(0.3f, 0.1f, 0.1f, 0.8f)); // Dark red theme
@@ -151,21 +155,22 @@ namespace CryingSnow.FastFoodRush
             windowStyle = new GUIStyle(GUI.skin.box);
             windowStyle.normal.background = MakeTexture(new Color(0.1f, 0.05f, 0.05f, 0.9f));
             
-            // Label style
+            // Label style - Optimized font size
             labelStyle = new GUIStyle(GUI.skin.label);
-            labelStyle.fontSize = Mathf.RoundToInt(11 * scaleFactor);
+            labelStyle.fontSize = Mathf.RoundToInt(10 * scaleFactor);
             labelStyle.normal.textColor = Color.white;
             
-            // Button style
+            // Button style - Optimized font size
             buttonStyle = new GUIStyle(GUI.skin.button);
-            buttonStyle.fontSize = Mathf.RoundToInt(10 * scaleFactor);
+            buttonStyle.fontSize = Mathf.RoundToInt(9 * scaleFactor);
             buttonStyle.normal.textColor = Color.white;
             buttonStyle.normal.background = MakeTexture(new Color(0.4f, 0.2f, 0.2f, 0.8f));
             buttonStyle.hover.background = MakeTexture(new Color(0.6f, 0.3f, 0.3f, 0.9f));
+            buttonStyle.wordWrap = true; // Allow text wrapping in buttons
             
-            // Header style
+            // Header style - Optimized font size
             headerStyle = new GUIStyle(labelStyle);
-            headerStyle.fontSize = Mathf.RoundToInt(14 * scaleFactor);
+            headerStyle.fontSize = Mathf.RoundToInt(12 * scaleFactor);
             headerStyle.fontStyle = FontStyle.Bold;
             headerStyle.normal.textColor = new Color(1f, 0.7f, 0.7f, 1f);
             
@@ -402,6 +407,13 @@ namespace CryingSnow.FastFoodRush
         
         public void DrawWindow()
         {
+            // Setup styles on first draw call (when GUI functions are available)
+            if (!stylesInitialized)
+            {
+                SetupStyles();
+                stylesInitialized = true;
+            }
+            
             // Update heat level over time
             UpdateHeatLevel();
             
@@ -417,9 +429,9 @@ namespace CryingSnow.FastFoodRush
             // Draw content based on active tab
             Rect contentRect = new Rect(
                 windowRect.x + 10 * scaleFactor,
-                windowRect.y + 80 * scaleFactor,
+                windowRect.y + 75 * scaleFactor, // Adjusted for optimized tabs
                 windowRect.width - 20 * scaleFactor,
-                windowRect.height - 90 * scaleFactor
+                windowRect.height - 85 * scaleFactor // Adjusted for optimized tabs
             );
             
             switch (currentTab)
@@ -442,7 +454,7 @@ namespace CryingSnow.FastFoodRush
         private void DrawTabs()
         {
             float tabWidth = windowRect.width / 4f;
-            float tabHeight = 40 * scaleFactor;
+            float tabHeight = 35 * scaleFactor; // Optimized height for smaller text
             float tabY = windowRect.y + 10 * scaleFactor;
             
             // Dealer tab
@@ -480,35 +492,36 @@ namespace CryingSnow.FastFoodRush
         
         private void DrawHeatLevelWarning()
         {
-            Rect heatRect = new Rect(windowRect.x + 10 * scaleFactor, windowRect.y + 55 * scaleFactor, 
+            Rect heatRect = new Rect(windowRect.x + 10 * scaleFactor, windowRect.y + 50 * scaleFactor, 
                                     windowRect.width - 20 * scaleFactor, 20 * scaleFactor);
             
-            string heatText = $"Heat Level: {heatLevel:F1}% | Cash: ${currentCash:N0}";
+            string heatText = $"Heat: {heatLevel:F0}% | Cash: {FormattedCash}";
             Color heatColor = Color.white;
             
             if (heatLevel > 80f)
             {
-                heatText += " ⚠️ EXTREME DANGER ⚠️";
+                heatText += " ⚠️ DANGER";
                 heatColor = Color.red;
             }
             else if (heatLevel > 60f)
             {
-                heatText += " ⚠️ HIGH RISK";
+                heatText += " ⚠️ HIGH";
                 heatColor = new Color(1f, 0.5f, 0f, 1f);
             }
             else if (heatLevel > 40f)
             {
-                heatText += " ⚠️ MEDIUM RISK";
+                heatText += " ⚠️ MEDIUM";
                 heatColor = Color.yellow;
             }
             else
             {
-                heatText += " ✓ LOW RISK";
+                heatText += " ✓ LOW";
                 heatColor = Color.green;
             }
             
-            GUIStyle heatStyle = new GUIStyle(labelStyle);
+            GUIStyle heatStyle = labelStyle != null ? new GUIStyle(labelStyle) : new GUIStyle();
             heatStyle.normal.textColor = heatColor;
+            heatStyle.fontStyle = FontStyle.Bold;
             
             GUI.Label(heatRect, heatText, heatStyle);
         }
@@ -516,95 +529,50 @@ namespace CryingSnow.FastFoodRush
         private void DrawDealerContent(Rect contentRect)
         {
             scrollPosition = GUI.BeginScrollView(contentRect, scrollPosition, 
-                new Rect(0, 0, contentRect.width - 20 * scaleFactor, dealers.Count * 200 * scaleFactor), 
+                new Rect(0, 0, contentRect.width - 20 * scaleFactor, dealers.Count * 80 * scaleFactor), 
                 false, true, GUIStyle.none, GUI.skin.verticalScrollbar);
             
             float yPos = 10 * scaleFactor;
             
             foreach (var dealer in dealers)
             {
-                Rect dealerRect = new Rect(10 * scaleFactor, yPos, contentRect.width - 40 * scaleFactor, 190 * scaleFactor);
+                Rect dealerRect = new Rect(10 * scaleFactor, yPos, contentRect.width - 40 * scaleFactor, 70 * scaleFactor);
                 GUI.Box(dealerRect, "", windowStyle);
                 
-                // Dealer header
+                // Dealer name and location
                 Color dealerColor = dealer.isActive ? Color.white : Color.gray;
-                GUIStyle dealerStyle = new GUIStyle(headerStyle);
+                GUIStyle dealerStyle = headerStyle != null ? new GUIStyle(headerStyle) : new GUIStyle();
                 dealerStyle.normal.textColor = dealerColor;
                 
-                GUI.Label(new Rect(dealerRect.x + 10 * scaleFactor, dealerRect.y + 5 * scaleFactor, 
-                                  dealerRect.width * 0.5f, 20 * scaleFactor), 
+                GUI.Label(new Rect(dealerRect.x + 15 * scaleFactor, dealerRect.y + 10 * scaleFactor, 
+                                  dealerRect.width * 0.5f, 25 * scaleFactor), 
                          $"{dealer.name} - {dealer.location}", dealerStyle);
                 
-                // Dealer stats
-                GUI.Label(new Rect(dealerRect.x + 10 * scaleFactor, dealerRect.y + 25 * scaleFactor, 
-                                  dealerRect.width * 0.3f, 15 * scaleFactor), 
-                         $"Rep: {dealer.reputation:F1}%", labelStyle);
-                
-                GUI.Label(new Rect(dealerRect.x + dealerRect.width * 0.3f, dealerRect.y + 25 * scaleFactor, 
-                                  dealerRect.width * 0.3f, 15 * scaleFactor), 
-                         $"Trust: {dealer.trustLevel:F1}%", labelStyle);
-                
-                GUI.Label(new Rect(dealerRect.x + 10 * scaleFactor, dealerRect.y + 40 * scaleFactor, 
-                                  dealerRect.width * 0.4f, 15 * scaleFactor), 
-                         $"Commission: {dealer.commission:F1}%", labelStyle);
-                
-                GUI.Label(new Rect(dealerRect.x + dealerRect.width * 0.4f, dealerRect.y + 40 * scaleFactor, 
-                                  dealerRect.width * 0.4f, 15 * scaleFactor), 
-                         $"Last Contact: {dealer.lastContact:MM/dd}", labelStyle);
-                
-                // Status and action button
+                // Status
                 string statusText = dealer.isActive ? "ACTIVE" : "INACTIVE";
                 Color statusColor = dealer.isActive ? Color.green : Color.red;
                 
-                GUIStyle statusStyle = new GUIStyle(labelStyle);
+                GUIStyle statusStyle = labelStyle != null ? new GUIStyle(labelStyle) : new GUIStyle();
                 statusStyle.normal.textColor = statusColor;
+                statusStyle.fontStyle = FontStyle.Bold;
                 
-                GUI.Label(new Rect(dealerRect.x + dealerRect.width - 100 * scaleFactor, dealerRect.y + 5 * scaleFactor, 
-                                  80 * scaleFactor, 20 * scaleFactor), 
+                GUI.Label(new Rect(dealerRect.x + 15 * scaleFactor, dealerRect.y + 35 * scaleFactor, 
+                                  dealerRect.width * 0.3f, 25 * scaleFactor), 
                          statusText, statusStyle);
                 
-                if (GUI.Button(new Rect(dealerRect.x + dealerRect.width - 80 * scaleFactor, dealerRect.y + 25 * scaleFactor, 
-                                       70 * scaleFactor, 25 * scaleFactor), "CONTACT", buttonStyle))
+                // Reputation (simplified)
+                GUI.Label(new Rect(dealerRect.x + dealerRect.width * 0.4f, dealerRect.y + 35 * scaleFactor, 
+                                  dealerRect.width * 0.3f, 25 * scaleFactor), 
+                         $"Rep: {dealer.reputation:F0}%", labelStyle);
+                
+                // Contact button (spans full width at bottom)
+                if (GUI.Button(new Rect(dealerRect.x + dealerRect.width - 90 * scaleFactor, dealerRect.y + 10 * scaleFactor, 
+                                       80 * scaleFactor, 50 * scaleFactor), "CONTACT", buttonStyle))
                 {
                     ContactDealer(dealer);
                 }
                 
-                // Drugs available
-                GUI.Label(new Rect(dealerRect.x + 10 * scaleFactor, dealerRect.y + 60 * scaleFactor, 
-                                  dealerRect.width - 20 * scaleFactor, 15 * scaleFactor), 
-                         "Available Products:", headerStyle);
-                
-                float drugY = dealerRect.y + 80 * scaleFactor;
-                foreach (var drug in dealer.drugsAvailable)
-                {
-                    // Drug info
-                    GUI.Label(new Rect(dealerRect.x + 20 * scaleFactor, drugY, 
-                                      dealerRect.width * 0.3f, 15 * scaleFactor), 
-                             $"{drug.name} ({drug.type})", labelStyle);
-                    
-                    GUI.Label(new Rect(dealerRect.x + dealerRect.width * 0.3f, drugY, 
-                                      dealerRect.width * 0.2f, 15 * scaleFactor), 
-                             $"${drug.pricePerUnit:F0}/unit", labelStyle);
-                    
-                    GUI.Label(new Rect(dealerRect.x + dealerRect.width * 0.5f, drugY, 
-                                      dealerRect.width * 0.15f, 15 * scaleFactor), 
-                             $"{drug.unitsAvailable} units", labelStyle);
-                    
-                    GUI.Label(new Rect(dealerRect.x + dealerRect.width * 0.65f, drugY, 
-                                      dealerRect.width * 0.15f, 15 * scaleFactor), 
-                             $"{drug.purity:F1}% pure", labelStyle);
-                    
-                    // Risk level with color
-                    GUIStyle riskStyle = new GUIStyle(labelStyle);
-                    riskStyle.normal.textColor = drug.GetRiskColor();
-                    GUI.Label(new Rect(dealerRect.x + dealerRect.width * 0.8f, drugY, 
-                                      dealerRect.width * 0.15f, 15 * scaleFactor), 
-                             $"Risk: {drug.riskLevel:F0}%", riskStyle);
-                    
-                    drugY += 20 * scaleFactor;
-                }
-                
-                yPos += 200 * scaleFactor;
+                yPos += 80 * scaleFactor;
             }
             
             GUI.EndScrollView();
@@ -612,67 +580,45 @@ namespace CryingSnow.FastFoodRush
         
         private void DrawActivityContent(Rect contentRect)
         {
-            // Daily summary
+            // Daily summary header
             GUI.Label(new Rect(contentRect.x + 10 * scaleFactor, contentRect.y + 10 * scaleFactor, 
-                              contentRect.width - 20 * scaleFactor, 20 * scaleFactor), 
-                     "📊 DAILY BUSINESS REPORTS", headerStyle);
+                              contentRect.width - 20 * scaleFactor, 25 * scaleFactor), 
+                     "📊 BUSINESS REPORTS", headerStyle);
             
             scrollPosition = GUI.BeginScrollView(
                 new Rect(contentRect.x, contentRect.y + 40 * scaleFactor, contentRect.width, contentRect.height - 40 * scaleFactor), 
                 scrollPosition, 
-                new Rect(0, 0, contentRect.width - 20 * scaleFactor, activityReports.Count * 80 * scaleFactor), 
+                new Rect(0, 0, contentRect.width - 20 * scaleFactor, activityReports.Count * 60 * scaleFactor), 
                 false, true, GUIStyle.none, GUI.skin.verticalScrollbar);
             
             float yPos = 10 * scaleFactor;
             
             foreach (var report in activityReports)
             {
-                Rect reportRect = new Rect(10 * scaleFactor, yPos, contentRect.width - 40 * scaleFactor, 70 * scaleFactor);
+                Rect reportRect = new Rect(10 * scaleFactor, yPos, contentRect.width - 40 * scaleFactor, 50 * scaleFactor);
                 GUI.Box(reportRect, "", windowStyle);
                 
                 // Date and dealer
-                GUI.Label(new Rect(reportRect.x + 10 * scaleFactor, reportRect.y + 5 * scaleFactor, 
-                                  reportRect.width * 0.3f, 15 * scaleFactor), 
-                         $"{report.date:MM/dd/yyyy} - {report.dealerName}", headerStyle);
+                GUI.Label(new Rect(reportRect.x + 15 * scaleFactor, reportRect.y + 5 * scaleFactor, 
+                                  reportRect.width * 0.4f, 20 * scaleFactor), 
+                         $"{report.date:MM/dd} - {report.dealerName}", headerStyle);
                 
-                // Activity
-                GUI.Label(new Rect(reportRect.x + 10 * scaleFactor, reportRect.y + 20 * scaleFactor, 
-                                  reportRect.width * 0.5f, 15 * scaleFactor), 
-                         report.activity, labelStyle);
-                
-                // Financial info
-                GUI.Label(new Rect(reportRect.x + 10 * scaleFactor, reportRect.y + 35 * scaleFactor, 
-                                  reportRect.width * 0.25f, 15 * scaleFactor), 
-                         $"Revenue: ${report.revenue:N0}", labelStyle);
-                
-                GUI.Label(new Rect(reportRect.x + reportRect.width * 0.25f, reportRect.y + 35 * scaleFactor, 
-                                  reportRect.width * 0.25f, 15 * scaleFactor), 
-                         $"Expenses: ${report.expenses:N0}", labelStyle);
-                
-                // Profit with color
+                // Profit with color (main focus)
                 Color profitColor = report.profit >= 0 ? Color.green : Color.red;
-                GUIStyle profitStyle = new GUIStyle(labelStyle);
+                GUIStyle profitStyle = labelStyle != null ? new GUIStyle(labelStyle) : new GUIStyle();
                 profitStyle.normal.textColor = profitColor;
+                profitStyle.fontStyle = FontStyle.Bold;
                 
-                GUI.Label(new Rect(reportRect.x + reportRect.width * 0.5f, reportRect.y + 35 * scaleFactor, 
-                                  reportRect.width * 0.25f, 15 * scaleFactor), 
+                GUI.Label(new Rect(reportRect.x + 15 * scaleFactor, reportRect.y + 25 * scaleFactor, 
+                                  reportRect.width * 0.3f, 20 * scaleFactor), 
                          $"Profit: ${report.profit:N0}", profitStyle);
                 
-                // Risk and status
-                GUIStyle riskStyle = new GUIStyle(labelStyle);
-                if (report.riskFactor > 60f) riskStyle.normal.textColor = Color.red;
-                else if (report.riskFactor > 30f) riskStyle.normal.textColor = Color.yellow;
-                else riskStyle.normal.textColor = Color.green;
-                
-                GUI.Label(new Rect(reportRect.x + reportRect.width * 0.75f, reportRect.y + 20 * scaleFactor, 
-                                  reportRect.width * 0.2f, 15 * scaleFactor), 
-                         $"Risk: {report.riskFactor:F0}%", riskStyle);
-                
-                GUI.Label(new Rect(reportRect.x + reportRect.width * 0.75f, reportRect.y + 35 * scaleFactor, 
-                                  reportRect.width * 0.2f, 15 * scaleFactor), 
+                // Status
+                GUI.Label(new Rect(reportRect.x + reportRect.width * 0.5f, reportRect.y + 25 * scaleFactor, 
+                                  reportRect.width * 0.3f, 20 * scaleFactor), 
                          report.status, labelStyle);
                 
-                yPos += 80 * scaleFactor;
+                yPos += 60 * scaleFactor;
             }
             
             GUI.EndScrollView();
@@ -681,64 +627,75 @@ namespace CryingSnow.FastFoodRush
         private void DrawInvestContent(Rect contentRect)
         {
             scrollPosition = GUI.BeginScrollView(contentRect, scrollPosition, 
-                new Rect(0, 0, contentRect.width - 20 * scaleFactor, investments.Count * 120 * scaleFactor), 
+                new Rect(0, 0, contentRect.width - 20 * scaleFactor, investments.Count * 140 * scaleFactor), 
                 false, true, GUIStyle.none, GUI.skin.verticalScrollbar);
             
             float yPos = 10 * scaleFactor;
             
             foreach (var investment in investments)
             {
-                Rect investRect = new Rect(10 * scaleFactor, yPos, contentRect.width - 40 * scaleFactor, 110 * scaleFactor);
+                Rect investRect = new Rect(10 * scaleFactor, yPos, contentRect.width - 40 * scaleFactor, 130 * scaleFactor);
                 GUI.Box(investRect, "", windowStyle);
                 
                 // Investment name and status
                 Color statusColor = investment.isActive ? Color.green : Color.white;
-                GUIStyle investStyle = new GUIStyle(headerStyle);
+                GUIStyle investStyle = headerStyle != null ? new GUIStyle(headerStyle) : new GUIStyle();
                 investStyle.normal.textColor = statusColor;
                 
-                GUI.Label(new Rect(investRect.x + 10 * scaleFactor, investRect.y + 5 * scaleFactor, 
+                GUI.Label(new Rect(investRect.x + 15 * scaleFactor, investRect.y + 10 * scaleFactor, 
                                   investRect.width * 0.6f, 20 * scaleFactor), 
                          investment.name, investStyle);
                 
                 string statusText = investment.isActive ? "ACTIVE" : "AVAILABLE";
-                GUI.Label(new Rect(investRect.x + investRect.width * 0.7f, investRect.y + 5 * scaleFactor, 
-                                  investRect.width * 0.25f, 20 * scaleFactor), 
+                GUI.Label(new Rect(investRect.x + investRect.width * 0.65f, investRect.y + 10 * scaleFactor, 
+                                  investRect.width * 0.3f, 20 * scaleFactor), 
                          statusText, investStyle);
                 
                 // Description
-                GUI.Label(new Rect(investRect.x + 10 * scaleFactor, investRect.y + 25 * scaleFactor, 
-                                  investRect.width - 20 * scaleFactor, 15 * scaleFactor), 
+                GUI.Label(new Rect(investRect.x + 15 * scaleFactor, investRect.y + 35 * scaleFactor, 
+                                  investRect.width - 30 * scaleFactor, 18 * scaleFactor), 
                          investment.description, labelStyle);
                 
                 // Investment details
-                GUI.Label(new Rect(investRect.x + 10 * scaleFactor, investRect.y + 45 * scaleFactor, 
-                                  investRect.width * 0.25f, 15 * scaleFactor), 
+                GUI.Label(new Rect(investRect.x + 15 * scaleFactor, investRect.y + 60 * scaleFactor, 
+                                  investRect.width * 0.25f, 18 * scaleFactor), 
                          $"Cost: ${investment.costToInvest:N0}", labelStyle);
                 
-                GUI.Label(new Rect(investRect.x + investRect.width * 0.25f, investRect.y + 45 * scaleFactor, 
-                                  investRect.width * 0.25f, 15 * scaleFactor), 
+                GUI.Label(new Rect(investRect.x + investRect.width * 0.25f, investRect.y + 60 * scaleFactor, 
+                                  investRect.width * 0.25f, 18 * scaleFactor), 
                          $"Return: {investment.expectedReturn:F1}%", labelStyle);
                 
-                GUI.Label(new Rect(investRect.x + investRect.width * 0.5f, investRect.y + 45 * scaleFactor, 
-                                  investRect.width * 0.25f, 15 * scaleFactor), 
+                GUI.Label(new Rect(investRect.x + investRect.width * 0.5f, investRect.y + 60 * scaleFactor, 
+                                  investRect.width * 0.25f, 18 * scaleFactor), 
                          $"Time: {investment.timeToMaturity:F0} months", labelStyle);
                 
                 // Risk level
-                GUIStyle riskStyle = new GUIStyle(labelStyle);
+                GUIStyle riskStyle = labelStyle != null ? new GUIStyle(labelStyle) : new GUIStyle();
                 if (investment.riskLevel > 50f) riskStyle.normal.textColor = Color.red;
                 else if (investment.riskLevel > 25f) riskStyle.normal.textColor = Color.yellow;
                 else riskStyle.normal.textColor = Color.green;
                 
-                GUI.Label(new Rect(investRect.x + investRect.width * 0.75f, investRect.y + 45 * scaleFactor, 
-                                  investRect.width * 0.2f, 15 * scaleFactor), 
+                GUI.Label(new Rect(investRect.x + investRect.width * 0.75f, investRect.y + 60 * scaleFactor, 
+                                  investRect.width * 0.2f, 18 * scaleFactor), 
                          $"Risk: {investment.riskLevel:F0}%", riskStyle);
                 
-                // Action button
-                string buttonText = investment.isActive ? "MANAGE" : "INVEST";
-                GUI.enabled = !investment.isActive ? currentCash >= investment.costToInvest : true;
+                // Action button with descriptive text
+                string buttonText;
+                if (investment.isActive)
+                {
+                    float progress = (float)(DateTime.Now - investment.startDate).TotalDays / (investment.timeToMaturity * 30f);
+                    progress = Mathf.Clamp01(progress);
+                    buttonText = progress >= 1.0f ? "COLLECT" : "CASH OUT";
+                }
+                else
+                {
+                    buttonText = "INVEST";
+                }
                 
-                if (GUI.Button(new Rect(investRect.x + 10 * scaleFactor, investRect.y + 70 * scaleFactor, 
-                                       100 * scaleFactor, 30 * scaleFactor), 
+                GUI.enabled = !investment.isActive ? CurrentCash >= investment.costToInvest : true;
+                
+                if (GUI.Button(new Rect(investRect.x + 15 * scaleFactor, investRect.y + 85 * scaleFactor, 
+                                       90 * scaleFactor, 30 * scaleFactor), 
                               buttonText, buttonStyle))
                 {
                     if (investment.isActive)
@@ -759,17 +716,17 @@ namespace CryingSnow.FastFoodRush
                     float progress = (float)(DateTime.Now - investment.startDate).TotalDays / (investment.timeToMaturity * 30f);
                     progress = Mathf.Clamp01(progress);
                     
-                    Rect progressRect = new Rect(investRect.x + 120 * scaleFactor, investRect.y + 75 * scaleFactor, 
+                    Rect progressRect = new Rect(investRect.x + 120 * scaleFactor, investRect.y + 90 * scaleFactor, 
                                                investRect.width - 140 * scaleFactor, 20 * scaleFactor);
                     GUI.Box(progressRect, "", windowStyle);
                     
                     Rect fillRect = new Rect(progressRect.x, progressRect.y, progressRect.width * progress, progressRect.height);
-                    GUI.Box(fillRect, "", new GUIStyle(GUI.skin.box) { normal = { background = MakeTexture(Color.green) } });
+                    GUI.Box(fillRect, "", new GUIStyle(GUI.skin.box) { normal = { background = MakeTexture(new Color(0.2f, 0.6f, 0.8f, 0.8f)) } }); // Soft blue color
                     
                     GUI.Label(progressRect, $"Progress: {progress * 100f:F1}%", labelStyle);
                 }
                 
-                yPos += 120 * scaleFactor;
+                yPos += 140 * scaleFactor;
             }
             
             GUI.EndScrollView();
@@ -777,61 +734,61 @@ namespace CryingSnow.FastFoodRush
         
         private void DrawLegalContent(Rect contentRect)
         {
-            // Warning header
+            // Header
             GUI.Label(new Rect(contentRect.x + 10 * scaleFactor, contentRect.y + 10 * scaleFactor, 
                               contentRect.width - 20 * scaleFactor, 20 * scaleFactor), 
                      "⚖️ LEGAL SERVICES & RISK MANAGEMENT", headerStyle);
             
             scrollPosition = GUI.BeginScrollView(
-                new Rect(contentRect.x, contentRect.y + 40 * scaleFactor, contentRect.width, contentRect.height - 40 * scaleFactor), 
+                new Rect(contentRect.x, contentRect.y + 35 * scaleFactor, contentRect.width, contentRect.height - 35 * scaleFactor), 
                 scrollPosition, 
-                new Rect(0, 0, contentRect.width - 20 * scaleFactor, legalServices.Count * 100 * scaleFactor), 
+                new Rect(0, 0, contentRect.width - 20 * scaleFactor, legalServices.Count * 115 * scaleFactor), 
                 false, true, GUIStyle.none, GUI.skin.verticalScrollbar);
             
             float yPos = 10 * scaleFactor;
             
             foreach (var service in legalServices)
             {
-                Rect serviceRect = new Rect(10 * scaleFactor, yPos, contentRect.width - 40 * scaleFactor, 90 * scaleFactor);
+                Rect serviceRect = new Rect(10 * scaleFactor, yPos, contentRect.width - 40 * scaleFactor, 105 * scaleFactor);
                 GUI.Box(serviceRect, "", windowStyle);
                 
                 // Service name and availability
                 Color availabilityColor = service.isAvailable ? Color.white : Color.gray;
-                GUIStyle serviceStyle = new GUIStyle(headerStyle);
+                GUIStyle serviceStyle = headerStyle != null ? new GUIStyle(headerStyle) : new GUIStyle();
                 serviceStyle.normal.textColor = availabilityColor;
                 
-                GUI.Label(new Rect(serviceRect.x + 10 * scaleFactor, serviceRect.y + 5 * scaleFactor, 
+                GUI.Label(new Rect(serviceRect.x + 15 * scaleFactor, serviceRect.y + 10 * scaleFactor, 
                                   serviceRect.width * 0.6f, 20 * scaleFactor), 
                          service.serviceName, serviceStyle);
                 
                 string availabilityText = service.isAvailable ? "AVAILABLE" : "UNAVAILABLE";
-                GUI.Label(new Rect(serviceRect.x + serviceRect.width * 0.7f, serviceRect.y + 5 * scaleFactor, 
-                                  serviceRect.width * 0.25f, 20 * scaleFactor), 
+                GUI.Label(new Rect(serviceRect.x + serviceRect.width * 0.65f, serviceRect.y + 10 * scaleFactor, 
+                                  serviceRect.width * 0.3f, 20 * scaleFactor), 
                          availabilityText, serviceStyle);
                 
                 // Description
-                GUI.Label(new Rect(serviceRect.x + 10 * scaleFactor, serviceRect.y + 25 * scaleFactor, 
-                                  serviceRect.width - 20 * scaleFactor, 15 * scaleFactor), 
+                GUI.Label(new Rect(serviceRect.x + 15 * scaleFactor, serviceRect.y + 35 * scaleFactor, 
+                                  serviceRect.width - 30 * scaleFactor, 18 * scaleFactor), 
                          service.description, labelStyle);
                 
                 // Service details
-                GUI.Label(new Rect(serviceRect.x + 10 * scaleFactor, serviceRect.y + 45 * scaleFactor, 
-                                  serviceRect.width * 0.3f, 15 * scaleFactor), 
+                GUI.Label(new Rect(serviceRect.x + 15 * scaleFactor, serviceRect.y + 60 * scaleFactor, 
+                                  serviceRect.width * 0.3f, 18 * scaleFactor), 
                          $"Cost: ${service.cost:N0}", labelStyle);
                 
-                GUI.Label(new Rect(serviceRect.x + serviceRect.width * 0.3f, serviceRect.y + 45 * scaleFactor, 
-                                  serviceRect.width * 0.3f, 15 * scaleFactor), 
+                GUI.Label(new Rect(serviceRect.x + serviceRect.width * 0.35f, serviceRect.y + 60 * scaleFactor, 
+                                  serviceRect.width * 0.3f, 18 * scaleFactor), 
                          $"Success Rate: {service.successRate:F0}%", labelStyle);
                 
-                GUI.Label(new Rect(serviceRect.x + serviceRect.width * 0.6f, serviceRect.y + 45 * scaleFactor, 
-                                  serviceRect.width * 0.35f, 15 * scaleFactor), 
+                GUI.Label(new Rect(serviceRect.x + serviceRect.width * 0.65f, serviceRect.y + 60 * scaleFactor, 
+                                  serviceRect.width * 0.3f, 18 * scaleFactor), 
                          $"Last Used: {service.lastUsed:MM/dd/yyyy}", labelStyle);
                 
                 // Action button
-                GUI.enabled = service.isAvailable && currentCash >= service.cost;
+                GUI.enabled = service.isAvailable && CurrentCash >= service.cost;
                 
-                if (GUI.Button(new Rect(serviceRect.x + 10 * scaleFactor, serviceRect.y + 65 * scaleFactor, 
-                                       120 * scaleFactor, 20 * scaleFactor), 
+                if (GUI.Button(new Rect(serviceRect.x + 15 * scaleFactor, serviceRect.y + 80 * scaleFactor, 
+                                       120 * scaleFactor, 25 * scaleFactor), 
                               "HIRE SERVICE", buttonStyle))
                 {
                     HireLegalService(service);
@@ -839,7 +796,7 @@ namespace CryingSnow.FastFoodRush
                 
                 GUI.enabled = true;
                 
-                yPos += 100 * scaleFactor;
+                yPos += 115 * scaleFactor;
             }
             
             GUI.EndScrollView();
@@ -848,14 +805,36 @@ namespace CryingSnow.FastFoodRush
         private void ContactDealer(Dealer dealer)
         {
             dealer.lastContact = DateTime.Now;
-            Debug.Log($"Contacted dealer: {dealer.name}");
+            
+            // Toggle dealer active status
+            dealer.isActive = !dealer.isActive;
+            
+            // Provide feedback based on action
+            if (dealer.isActive)
+            {
+                // Increase reputation slightly when activating
+                dealer.reputation = Mathf.Min(100f, dealer.reputation + UnityEngine.Random.Range(2f, 5f));
+                Debug.Log($"✅ {dealer.name} is now ACTIVE and ready for business!");
+            }
+            else
+            {
+                Debug.Log($"❌ {dealer.name} has been deactivated.");
+            }
+            
+            // Add some cost for contacting (communication fees)
+            int contactCost = 50;
+            if (RestaurantManager.Instance.GetMoney() >= contactCost)
+            {
+                RestaurantManager.Instance.AdjustMoney(-contactCost);
+                Debug.Log($"💰 Contact fee: ${contactCost}");
+            }
         }
         
         private void MakeInvestment(Investment investment)
         {
-            if (currentCash >= investment.costToInvest)
+            if (CurrentCash >= investment.costToInvest)
             {
-                currentCash -= investment.costToInvest;
+                RestaurantManager.Instance.AdjustMoney(-(int)investment.costToInvest);
                 investment.isActive = true;
                 investment.startDate = DateTime.Now;
                 Debug.Log($"Invested in: {investment.name}");
@@ -864,27 +843,76 @@ namespace CryingSnow.FastFoodRush
         
         private void ManageInvestment(Investment investment)
         {
-            Debug.Log($"Managing investment: {investment.name}");
+            // Calculate current progress and potential returns
+            float progress = (float)(DateTime.Now - investment.startDate).TotalDays / (investment.timeToMaturity * 30f);
+            progress = Mathf.Clamp01(progress);
+            
+            if (progress >= 1.0f)
+            {
+                // Investment is complete - cash out full returns
+                long returnAmount = (long)(investment.costToInvest * (1f + investment.expectedReturn / 100f));
+                RestaurantManager.Instance.AdjustMoney((int)returnAmount);
+                investment.isActive = false;
+                Debug.Log($"✅ {investment.name} completed! Received ${returnAmount:N0} (${returnAmount - investment.costToInvest:N0} profit)");
+            }
+            else
+            {
+                // Early cash out with penalty
+                float earlyPenalty = 0.25f; // 25% penalty for early withdrawal
+                long earlyAmount = (long)(investment.costToInvest * (1f - earlyPenalty + (progress * investment.expectedReturn / 100f * 0.5f)));
+                
+                RestaurantManager.Instance.AdjustMoney((int)earlyAmount);
+                investment.isActive = false;
+                Debug.Log($"⚠️ {investment.name} cashed out early! Received ${earlyAmount:N0} (25% penalty applied)");
+                Debug.Log($"💡 Tip: Waiting for completion would have earned ${(long)(investment.costToInvest * (1f + investment.expectedReturn / 100f)):N0}");
+            }
         }
         
         private void HireLegalService(LegalService service)
         {
-            if (currentCash >= service.cost)
+            if (CurrentCash >= service.cost)
             {
-                currentCash -= service.cost;
+                RestaurantManager.Instance.AdjustMoney(-(int)service.cost);
                 service.lastUsed = DateTime.Now;
                 
-                // Apply service effects
-                if (service.serviceName.Contains("Bribe"))
+                // Apply specific service effects based on service type
+                if (service.serviceName.Contains("Criminal Defense"))
+                {
+                    heatLevel = Mathf.Max(0f, heatLevel - 10f);
+                    Debug.Log($"✅ {service.serviceName} hired! Heat reduced by 10. Legal protection increased.");
+                }
+                else if (service.serviceName.Contains("Police Bribe"))
                 {
                     heatLevel = Mathf.Max(0f, heatLevel - 20f);
+                    Debug.Log($"💰 {service.serviceName} paid! Heat reduced by 20. Investigation pressure lowered.");
+                }
+                else if (service.serviceName.Contains("Post Bail"))
+                {
+                    heatLevel = Mathf.Max(0f, heatLevel - 5f);
+                    Debug.Log($"🔓 {service.serviceName} posted! Heat reduced by 5. Immediate freedom secured.");
                 }
                 else if (service.serviceName.Contains("Evidence"))
                 {
                     heatLevel = Mathf.Max(0f, heatLevel - 15f);
+                    Debug.Log($"🗂️ {service.serviceName} completed! Heat reduced by 15. Incriminating evidence removed.");
+                }
+                else if (service.serviceName.Contains("Witness"))
+                {
+                    heatLevel = Mathf.Max(0f, heatLevel - 12f);
+                    Debug.Log($"🤫 {service.serviceName} arranged! Heat reduced by 12. Witness testimony secured.");
+                }
+                else if (service.serviceName.Contains("Judge"))
+                {
+                    heatLevel = Mathf.Max(0f, heatLevel - 25f);
+                    Debug.Log($"⚖️ {service.serviceName} secured! Heat reduced by 25. Court decisions will favor you.");
+                }
+                else
+                {
+                    Debug.Log($"Hired: {service.serviceName}");
                 }
                 
-                Debug.Log($"Hired: {service.serviceName}");
+                // Show immediate visual feedback
+                Debug.Log($"💳 Cost: ${service.cost:N0} | Current Heat Level: {heatLevel:F1}%");
             }
         }
         

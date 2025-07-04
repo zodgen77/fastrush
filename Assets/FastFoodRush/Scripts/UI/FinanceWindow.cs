@@ -7,6 +7,7 @@ namespace CryingSnow.FastFoodRush
     /// <summary>
     /// Finance Window with Bank, Stocks, Bonds, and Crypto tabs
     /// Contains simulated market data and trading functionality
+    /// Enhanced with interactive banking features
     /// </summary>
     public class FinanceWindow : MonoBehaviour
     {
@@ -42,6 +43,27 @@ namespace CryingSnow.FastFoodRush
             public float balance;
             public float interestRate;
             public DateTime lastUpdated;
+            public bool isLoanAccount;
+            public float creditLimit;
+            public float minimumPayment;
+            
+            public bool CanWithdraw(float amount)
+            {
+                if (isLoanAccount)
+                {
+                    return (balance + amount) <= creditLimit;
+                }
+                return balance >= amount;
+            }
+            
+            public float GetAvailableCredit()
+            {
+                if (isLoanAccount)
+                {
+                    return creditLimit - balance;
+                }
+                return balance;
+            }
         }
         
         // Tab system
@@ -57,6 +79,9 @@ namespace CryingSnow.FastFoodRush
         private GUIStyle labelStyle;
         private GUIStyle buttonStyle;
         private GUIStyle scrollViewStyle;
+        private GUIStyle headerStyle;
+        private GUIStyle textFieldStyle;
+        private bool stylesInitialized = false;
         
         // Scrolling
         private Vector2 scrollPosition = Vector2.zero;
@@ -72,8 +97,21 @@ namespace CryingSnow.FastFoodRush
         private float marketUpdateInterval = 5f; // Update every 5 seconds
         
         // Trading
-        private float playerCash = 50000f;
         private int selectedTradeAmount = 1;
+        
+        // Banking
+        private string loanAmount = "1000";
+        private int selectedAccountIndex = 0;
+        private bool showLoanOptions = false;
+        private bool showTransactionHistory = false;
+        private List<string> transactionHistory = new List<string>();
+        
+        // Preset transaction amounts
+        private readonly float[] presetAmounts = { 100f, 1000f, 10000f };
+        
+        // Property to access centralized money system
+        private long PlayerCash => RestaurantManager.Instance.GetMoney();
+        private string FormattedCash => RestaurantManager.Instance.GetFormattedMoney(PlayerCash);
         
         public void Initialize(Rect screenRect, float scale)
         {
@@ -87,9 +125,12 @@ namespace CryingSnow.FastFoodRush
                 screenRect.height - 160 * scaleFactor
             );
             
-            SetupStyles();
+            // Note: SetupStyles() moved to DrawWindow() to avoid GUI access errors
             GenerateMarketData();
             GenerateBankAccounts();
+            
+            // Initialize transaction history
+            transactionHistory.Add($"{DateTime.Now:MM/dd HH:mm} - Account opened");
         }
         
         private void SetupStyles()
@@ -118,6 +159,17 @@ namespace CryingSnow.FastFoodRush
             buttonStyle = new GUIStyle(GUI.skin.button);
             buttonStyle.fontSize = Mathf.RoundToInt(10 * scaleFactor);
             buttonStyle.normal.textColor = Color.white;
+            
+            // Header style
+            headerStyle = new GUIStyle(labelStyle);
+            headerStyle.fontSize = Mathf.RoundToInt(16 * scaleFactor);
+            headerStyle.fontStyle = FontStyle.Bold;
+            headerStyle.normal.textColor = new Color(1f, 0.8f, 0f, 1f);
+            
+            // TextField style
+            textFieldStyle = new GUIStyle(GUI.skin.textField);
+            textFieldStyle.fontSize = Mathf.RoundToInt(12 * scaleFactor);
+            textFieldStyle.normal.textColor = Color.white;
             
             // Scroll view style
             scrollViewStyle = new GUIStyle(GUI.skin.scrollView);
@@ -168,10 +220,10 @@ namespace CryingSnow.FastFoodRush
         {
             bankAccounts = new List<BankAccount>
             {
-                new BankAccount { accountType = "Checking", accountNumber = "****1234", balance = 15420.33f, interestRate = 0.01f, lastUpdated = DateTime.Now },
-                new BankAccount { accountType = "Savings", accountNumber = "****5678", balance = 45230.12f, interestRate = 2.15f, lastUpdated = DateTime.Now },
-                new BankAccount { accountType = "Money Market", accountNumber = "****9012", balance = 78540.89f, interestRate = 3.45f, lastUpdated = DateTime.Now },
-                new BankAccount { accountType = "CD 12-Month", accountNumber = "****3456", balance = 25000.00f, interestRate = 4.25f, lastUpdated = DateTime.Now.AddDays(-90) }
+                new BankAccount { accountType = "Checking", accountNumber = "****1234", balance = 500.00f, interestRate = 0.01f, lastUpdated = DateTime.Now, isLoanAccount = false, creditLimit = 0, minimumPayment = 0 },
+                new BankAccount { accountType = "Savings", accountNumber = "****5678", balance = 1200.00f, interestRate = 2.15f, lastUpdated = DateTime.Now, isLoanAccount = false, creditLimit = 0, minimumPayment = 0 },
+                new BankAccount { accountType = "Credit Line", accountNumber = "****9999", balance = 0.00f, interestRate = 8.99f, lastUpdated = DateTime.Now, isLoanAccount = true, creditLimit = 10000.00f, minimumPayment = 0 },
+                new BankAccount { accountType = "Business Loan", accountNumber = "****7777", balance = 0.00f, interestRate = 6.25f, lastUpdated = DateTime.Now, isLoanAccount = true, creditLimit = 50000.00f, minimumPayment = 0 }
             };
         }
         
@@ -185,6 +237,13 @@ namespace CryingSnow.FastFoodRush
         
         public void DrawWindow()
         {
+            // Setup styles on first draw call (when GUI functions are available)
+            if (!stylesInitialized)
+            {
+                SetupStyles();
+                stylesInitialized = true;
+            }
+            
             // Update market data periodically
             if (Time.time - lastMarketUpdate > marketUpdateInterval)
             {
@@ -264,48 +323,341 @@ namespace CryingSnow.FastFoodRush
         
         private void DrawBankContent(Rect contentRect)
         {
+            // Calculate dynamic height based on content
+            float contentHeight = 800 * scaleFactor;
+            if (showLoanOptions) contentHeight += 200 * scaleFactor;
+            if (showTransactionHistory) contentHeight += 300 * scaleFactor;
+            
             scrollPosition = GUI.BeginScrollView(contentRect, scrollPosition, 
-                new Rect(0, 0, contentRect.width - 20 * scaleFactor, bankAccounts.Count * 120 * scaleFactor), 
+                new Rect(0, 0, contentRect.width - 20 * scaleFactor, contentHeight), 
                 false, true, GUIStyle.none, GUI.skin.verticalScrollbar);
             
             float yPos = 10 * scaleFactor;
             
-            // Draw total balance
+            // Draw player cash prominently
+            GUI.Label(new Rect(10 * scaleFactor, yPos, contentRect.width - 40 * scaleFactor, 30 * scaleFactor), 
+                     $"Player Cash: {FormattedCash}", headerStyle);
+            yPos += 40 * scaleFactor;
+            
+            // Draw total bank balance
             float totalBalance = 0;
-            foreach (var account in bankAccounts)
-                totalBalance += account.balance;
-            
-            GUI.Label(new Rect(10 * scaleFactor, yPos, contentRect.width - 40 * scaleFactor, 25 * scaleFactor), 
-                     $"Total Balance: ${totalBalance:N2}", labelStyle);
-            yPos += 35 * scaleFactor;
-            
-            // Draw each bank account
+            float totalDebt = 0;
             foreach (var account in bankAccounts)
             {
-                Rect accountRect = new Rect(10 * scaleFactor, yPos, contentRect.width - 40 * scaleFactor, 100 * scaleFactor);
-                GUI.Box(accountRect, "", windowStyle);
-                
-                // Account details
-                GUI.Label(new Rect(accountRect.x + 10 * scaleFactor, accountRect.y + 5 * scaleFactor, 
-                                  accountRect.width - 20 * scaleFactor, 20 * scaleFactor), 
-                         $"{account.accountType} {account.accountNumber}", labelStyle);
-                
-                GUI.Label(new Rect(accountRect.x + 10 * scaleFactor, accountRect.y + 25 * scaleFactor, 
-                                  accountRect.width - 20 * scaleFactor, 20 * scaleFactor), 
-                         $"Balance: ${account.balance:N2}", labelStyle);
-                
-                GUI.Label(new Rect(accountRect.x + 10 * scaleFactor, accountRect.y + 45 * scaleFactor, 
-                                  accountRect.width - 20 * scaleFactor, 20 * scaleFactor), 
-                         $"Interest Rate: {account.interestRate:F2}%", labelStyle);
-                
-                GUI.Label(new Rect(accountRect.x + 10 * scaleFactor, accountRect.y + 65 * scaleFactor, 
-                                  accountRect.width - 20 * scaleFactor, 20 * scaleFactor), 
-                         $"Last Updated: {account.lastUpdated:MM/dd/yyyy}", labelStyle);
-                
-                yPos += 110 * scaleFactor;
+                if (account.isLoanAccount && account.balance > 0)
+                    totalDebt += account.balance;
+                else if (!account.isLoanAccount)
+                    totalBalance += account.balance;
+            }
+            
+            GUI.Label(new Rect(10 * scaleFactor, yPos, contentRect.width - 40 * scaleFactor, 25 * scaleFactor), 
+                     $"Total Bank Balance: ${totalBalance:N2}", labelStyle);
+            yPos += 30 * scaleFactor;
+            
+            if (totalDebt > 0)
+            {
+                GUIStyle debtStyle = new GUIStyle(labelStyle);
+                debtStyle.normal.textColor = new Color(0.9f, 0.3f, 0.3f, 1f);
+                GUI.Label(new Rect(10 * scaleFactor, yPos, contentRect.width - 40 * scaleFactor, 25 * scaleFactor), 
+                         $"Total Debt: ${totalDebt:N2}", debtStyle);
+                yPos += 30 * scaleFactor;
+            }
+            
+            // Quick action buttons
+            float buttonWidth = (contentRect.width - 60 * scaleFactor) / 3f;
+            
+            if (GUI.Button(new Rect(10 * scaleFactor, yPos, buttonWidth, 40 * scaleFactor), "LOAN OPTIONS", buttonStyle))
+            {
+                showLoanOptions = !showLoanOptions;
+            }
+            
+            if (GUI.Button(new Rect(20 * scaleFactor + buttonWidth, yPos, buttonWidth, 40 * scaleFactor), "TRANSACTION HISTORY", buttonStyle))
+            {
+                showTransactionHistory = !showTransactionHistory;
+            }
+            
+            if (GUI.Button(new Rect(30 * scaleFactor + buttonWidth * 2, yPos, buttonWidth, 40 * scaleFactor), "REFRESH RATES", buttonStyle))
+            {
+                UpdateInterestRates();
+            }
+            
+            yPos += 50 * scaleFactor;
+            
+            // Draw loan options if expanded
+            if (showLoanOptions)
+            {
+                DrawLoanOptions(ref yPos, contentRect.width - 40 * scaleFactor);
+            }
+            
+            // Draw transaction history if expanded
+            if (showTransactionHistory)
+            {
+                DrawTransactionHistory(ref yPos, contentRect.width - 40 * scaleFactor);
+            }
+            
+            // Draw each bank account with interactive features
+            for (int i = 0; i < bankAccounts.Count; i++)
+            {
+                DrawBankAccount(bankAccounts[i], i, ref yPos, contentRect.width - 40 * scaleFactor);
             }
             
             GUI.EndScrollView();
+        }
+        
+        private void DrawLoanOptions(ref float yPos, float width)
+        {
+            Rect loanRect = new Rect(10 * scaleFactor, yPos, width, 180 * scaleFactor);
+            GUI.Box(loanRect, "", windowStyle);
+            
+            GUI.Label(new Rect(loanRect.x + 10 * scaleFactor, loanRect.y + 5 * scaleFactor, 
+                              loanRect.width - 20 * scaleFactor, 25 * scaleFactor), 
+                     "Loan Options", headerStyle);
+            
+            // Loan amount input
+            GUI.Label(new Rect(loanRect.x + 10 * scaleFactor, loanRect.y + 35 * scaleFactor, 
+                              100 * scaleFactor, 20 * scaleFactor), 
+                     "Loan Amount:", labelStyle);
+            
+            loanAmount = GUI.TextField(new Rect(loanRect.x + 120 * scaleFactor, loanRect.y + 35 * scaleFactor, 
+                                              100 * scaleFactor, 25 * scaleFactor), 
+                                     loanAmount, textFieldStyle);
+            
+            // Available loan products
+            GUI.Label(new Rect(loanRect.x + 10 * scaleFactor, loanRect.y + 70 * scaleFactor, 
+                              loanRect.width - 20 * scaleFactor, 20 * scaleFactor), 
+                     "Available Loan Products:", labelStyle);
+            
+            float loanButtonY = loanRect.y + 95 * scaleFactor;
+            float loanButtonWidth = (loanRect.width - 40 * scaleFactor) / 2f;
+            
+            if (GUI.Button(new Rect(loanRect.x + 10 * scaleFactor, loanButtonY, loanButtonWidth, 30 * scaleFactor), 
+                          "Credit Line (8.99%)", buttonStyle))
+            {
+                TakeLoan(2, float.Parse(loanAmount.Length > 0 ? loanAmount : "0"));
+            }
+            
+            if (GUI.Button(new Rect(loanRect.x + 20 * scaleFactor + loanButtonWidth, loanButtonY, loanButtonWidth, 30 * scaleFactor), 
+                          "Business Loan (6.25%)", buttonStyle))
+            {
+                TakeLoan(3, float.Parse(loanAmount.Length > 0 ? loanAmount : "0"));
+            }
+            
+            GUI.Label(new Rect(loanRect.x + 10 * scaleFactor, loanRect.y + 135 * scaleFactor, 
+                              loanRect.width - 20 * scaleFactor, 40 * scaleFactor), 
+                     "Note: Loans add money to your account and can be withdrawn as cash. Interest accrues daily.", labelStyle);
+            
+            yPos += 190 * scaleFactor;
+        }
+        
+        private void DrawTransactionHistory(ref float yPos, float width)
+        {
+            Rect historyRect = new Rect(10 * scaleFactor, yPos, width, 280 * scaleFactor);
+            GUI.Box(historyRect, "", windowStyle);
+            
+            GUI.Label(new Rect(historyRect.x + 10 * scaleFactor, historyRect.y + 5 * scaleFactor, 
+                              historyRect.width - 20 * scaleFactor, 25 * scaleFactor), 
+                     "Transaction History", headerStyle);
+            
+            // Display recent transactions
+            float historyY = historyRect.y + 35 * scaleFactor;
+            int maxTransactions = Mathf.Min(transactionHistory.Count, 10);
+            
+            for (int i = transactionHistory.Count - 1; i >= Mathf.Max(0, transactionHistory.Count - maxTransactions); i--)
+            {
+                GUI.Label(new Rect(historyRect.x + 10 * scaleFactor, historyY, 
+                                  historyRect.width - 20 * scaleFactor, 20 * scaleFactor), 
+                         transactionHistory[i], labelStyle);
+                historyY += 25 * scaleFactor;
+            }
+            
+            yPos += 290 * scaleFactor;
+        }
+        
+        private void DrawBankAccount(BankAccount account, int index, ref float yPos, float width)
+        {
+            Rect accountRect = new Rect(10 * scaleFactor, yPos, width, 200 * scaleFactor);
+            GUI.Box(accountRect, "", windowStyle);
+            
+            // Account header
+            string accountLabel = account.isLoanAccount ? 
+                $"{account.accountType} {account.accountNumber} (Available: ${account.GetAvailableCredit():N2})" :
+                $"{account.accountType} {account.accountNumber}";
+            
+            GUI.Label(new Rect(accountRect.x + 10 * scaleFactor, accountRect.y + 5 * scaleFactor, 
+                              accountRect.width - 20 * scaleFactor, 20 * scaleFactor), 
+                     accountLabel, headerStyle);
+            
+            // Balance/Debt display
+            GUIStyle balanceStyle = new GUIStyle(labelStyle);
+            string balanceText;
+            
+            if (account.isLoanAccount)
+            {
+                if (account.balance > 0)
+                {
+                    balanceStyle.normal.textColor = new Color(0.9f, 0.3f, 0.3f, 1f);
+                    balanceText = $"Debt: ${account.balance:N2}";
+                }
+                else
+                {
+                    balanceStyle.normal.textColor = new Color(0.3f, 0.9f, 0.3f, 1f);
+                    balanceText = "No Outstanding Debt";
+                }
+            }
+            else
+            {
+                balanceStyle.normal.textColor = account.balance > 0 ? new Color(0.3f, 0.9f, 0.3f, 1f) : Color.white;
+                balanceText = $"Balance: ${account.balance:N2}";
+            }
+            
+            GUI.Label(new Rect(accountRect.x + 10 * scaleFactor, accountRect.y + 30 * scaleFactor, 
+                              accountRect.width - 20 * scaleFactor, 20 * scaleFactor), 
+                     balanceText, balanceStyle);
+            
+            // Interest rate
+            GUI.Label(new Rect(accountRect.x + 10 * scaleFactor, accountRect.y + 55 * scaleFactor, 
+                              accountRect.width - 20 * scaleFactor, 20 * scaleFactor), 
+                     $"Interest Rate: {account.interestRate:F2}%", labelStyle);
+            
+            // Deposit section
+            float depositY = accountRect.y + 85 * scaleFactor;
+            GUI.Label(new Rect(accountRect.x + 10 * scaleFactor, depositY, 
+                              accountRect.width - 20 * scaleFactor, 20 * scaleFactor), 
+                     "Deposit:", labelStyle);
+            
+            // Deposit amount buttons
+            float buttonWidth = (accountRect.width - 60 * scaleFactor) / 4f;
+            float buttonY = depositY + 25 * scaleFactor;
+            
+            for (int i = 0; i < presetAmounts.Length; i++)
+            {
+                if (GUI.Button(new Rect(accountRect.x + 10 * scaleFactor + i * (buttonWidth + 5 * scaleFactor), buttonY, 
+                                       buttonWidth, 25 * scaleFactor), 
+                              $"${presetAmounts[i]:N0}", buttonStyle))
+                {
+                    DepositToAccount(index, presetAmounts[i]);
+                }
+            }
+            
+            // MAX deposit button
+            float maxAmount = PlayerCash;
+            if (GUI.Button(new Rect(accountRect.x + 10 * scaleFactor + 3 * (buttonWidth + 5 * scaleFactor), buttonY, 
+                                   buttonWidth, 25 * scaleFactor), 
+                          "MAX", buttonStyle))
+            {
+                DepositToAccount(index, maxAmount);
+            }
+            
+            // Withdraw section
+            float withdrawY = accountRect.y + 125 * scaleFactor;
+            GUI.Label(new Rect(accountRect.x + 10 * scaleFactor, withdrawY, 
+                              accountRect.width - 20 * scaleFactor, 20 * scaleFactor), 
+                     "Withdraw:", labelStyle);
+            
+            // Withdraw amount buttons
+            buttonY = withdrawY + 25 * scaleFactor;
+            
+            for (int i = 0; i < presetAmounts.Length; i++)
+            {
+                bool canWithdraw = account.CanWithdraw(presetAmounts[i]);
+                
+                // Different button style if can't withdraw
+                GUIStyle withdrawButtonStyle = canWithdraw ? buttonStyle : new GUIStyle(buttonStyle);
+                if (!canWithdraw)
+                {
+                    withdrawButtonStyle.normal.textColor = Color.gray;
+                }
+                
+                if (GUI.Button(new Rect(accountRect.x + 10 * scaleFactor + i * (buttonWidth + 5 * scaleFactor), buttonY, 
+                                       buttonWidth, 25 * scaleFactor), 
+                              $"${presetAmounts[i]:N0}", withdrawButtonStyle))
+                {
+                    if (canWithdraw)
+                    {
+                        WithdrawFromAccount(index, presetAmounts[i]);
+                    }
+                }
+            }
+            
+            // MAX withdraw button
+            float maxWithdrawAmount = account.GetAvailableCredit();
+            bool canWithdrawMax = maxWithdrawAmount > 0;
+            
+            GUIStyle maxWithdrawButtonStyle = canWithdrawMax ? buttonStyle : new GUIStyle(buttonStyle);
+            if (!canWithdrawMax)
+            {
+                maxWithdrawButtonStyle.normal.textColor = Color.gray;
+            }
+            
+            if (GUI.Button(new Rect(accountRect.x + 10 * scaleFactor + 3 * (buttonWidth + 5 * scaleFactor), buttonY, 
+                                   buttonWidth, 25 * scaleFactor), 
+                          "MAX", maxWithdrawButtonStyle))
+            {
+                if (canWithdrawMax)
+                {
+                    WithdrawFromAccount(index, maxWithdrawAmount);
+                }
+            }
+            
+            // Pay debt button for loan accounts
+            if (account.isLoanAccount && account.balance > 0)
+            {
+                float payDebtY = accountRect.y + 165 * scaleFactor;
+                GUI.Label(new Rect(accountRect.x + 10 * scaleFactor, payDebtY, 
+                                  accountRect.width - 20 * scaleFactor, 20 * scaleFactor), 
+                         "Pay Debt:", labelStyle);
+                
+                buttonY = payDebtY + 25 * scaleFactor;
+                
+                // Pay debt amount buttons
+                for (int i = 0; i < presetAmounts.Length; i++)
+                {
+                    float paymentAmount = Mathf.Min(presetAmounts[i], account.balance);
+                    bool canPay = PlayerCash >= paymentAmount && paymentAmount > 0;
+                    
+                    GUIStyle payButtonStyle = canPay ? buttonStyle : new GUIStyle(buttonStyle);
+                    if (!canPay)
+                    {
+                        payButtonStyle.normal.textColor = Color.gray;
+                    }
+                    
+                    if (GUI.Button(new Rect(accountRect.x + 10 * scaleFactor + i * (buttonWidth + 5 * scaleFactor), buttonY, 
+                                           buttonWidth, 25 * scaleFactor), 
+                                  $"${paymentAmount:N0}", payButtonStyle))
+                    {
+                        if (canPay)
+                        {
+                            PayDebt(index, paymentAmount);
+                        }
+                    }
+                }
+                
+                // PAY ALL debt button
+                float payAllAmount = Mathf.Min(PlayerCash, account.balance);
+                bool canPayAll = payAllAmount > 0;
+                
+                GUIStyle payAllButtonStyle = canPayAll ? buttonStyle : new GUIStyle(buttonStyle);
+                if (!canPayAll)
+                {
+                    payAllButtonStyle.normal.textColor = Color.gray;
+                }
+                
+                if (GUI.Button(new Rect(accountRect.x + 10 * scaleFactor + 3 * (buttonWidth + 5 * scaleFactor), buttonY, 
+                                       buttonWidth, 25 * scaleFactor), 
+                              "PAY ALL", payAllButtonStyle))
+                {
+                    if (canPayAll)
+                    {
+                        PayDebt(index, payAllAmount);
+                    }
+                }
+                
+                yPos += 240 * scaleFactor;
+            }
+            else
+            {
+                yPos += 210 * scaleFactor;
+            }
         }
         
         private void DrawStocksContent(Rect contentRect)
@@ -347,7 +699,7 @@ namespace CryingSnow.FastFoodRush
                          assetType == "Bond" ? $"{asset.currentPrice:F2}%" : $"${asset.currentPrice:F2}", labelStyle);
                 
                 // Change
-                GUIStyle changeStyle = new GUIStyle(labelStyle);
+                GUIStyle changeStyle = labelStyle != null ? new GUIStyle(labelStyle) : new GUIStyle();
                 changeStyle.normal.textColor = asset.GetChangeColor();
                 GUI.Label(new Rect(assetRect.x + assetRect.width * 0.3f, assetRect.y + 25 * scaleFactor, 
                                   assetRect.width * 0.2f, 20 * scaleFactor), 
@@ -383,9 +735,9 @@ namespace CryingSnow.FastFoodRush
         private void BuyAsset(FinancialAsset asset)
         {
             float cost = asset.currentPrice * selectedTradeAmount;
-            if (playerCash >= cost)
+            if (PlayerCash >= cost)
             {
-                playerCash -= cost;
+                RestaurantManager.Instance.AdjustMoney(-(int)cost);
                 asset.sharesOwned += selectedTradeAmount;
                 Debug.Log($"Bought {selectedTradeAmount} shares of {asset.symbol} for ${cost:F2}");
             }
@@ -400,7 +752,7 @@ namespace CryingSnow.FastFoodRush
             if (asset.sharesOwned >= selectedTradeAmount)
             {
                 float proceeds = asset.currentPrice * selectedTradeAmount;
-                playerCash += proceeds;
+                RestaurantManager.Instance.AdjustMoney((int)proceeds);
                 asset.sharesOwned -= selectedTradeAmount;
                 Debug.Log($"Sold {selectedTradeAmount} shares of {asset.symbol} for ${proceeds:F2}");
             }
@@ -436,6 +788,210 @@ namespace CryingSnow.FastFoodRush
                 crypto.currentPrice *= (1 + change);
                 crypto.changePercent = (crypto.currentPrice - crypto.previousPrice) / crypto.previousPrice * 100f;
             }
+        }
+        
+        // Banking functionality methods
+        private void TakeLoan(int accountIndex, float amount)
+        {
+            if (amount <= 0 || accountIndex < 0 || accountIndex >= bankAccounts.Count)
+            {
+                Debug.Log("Invalid loan amount or account.");
+                return;
+            }
+            
+            BankAccount account = bankAccounts[accountIndex];
+            
+            if (!account.isLoanAccount)
+            {
+                Debug.Log("This account does not support loans.");
+                return;
+            }
+            
+            // Check if loan amount exceeds available credit
+            if (account.balance + amount > account.creditLimit)
+            {
+                Debug.Log($"Loan amount exceeds available credit. Available: ${account.GetAvailableCredit():N2}");
+                return;
+            }
+            
+            // Add loan to account balance (increases debt)
+            account.balance += amount;
+            account.lastUpdated = DateTime.Now;
+            
+            // Add loan proceeds to bank account (can be withdrawn as cash)
+            // For loan accounts, we'll add it to the first non-loan account (checking)
+            if (bankAccounts.Count > 0 && !bankAccounts[0].isLoanAccount)
+            {
+                bankAccounts[0].balance += amount;
+                bankAccounts[0].lastUpdated = DateTime.Now;
+            }
+            
+            // Log transaction
+            string transaction = $"{DateTime.Now:MM/dd HH:mm} - Loan: ${amount:N2} from {account.accountType}";
+            transactionHistory.Add(transaction);
+            
+            Debug.Log($"Loan of ${amount:N2} approved and deposited to account.");
+        }
+        
+        private void DepositToAccount(int accountIndex, float amount)
+        {
+            if (amount <= 0 || accountIndex < 0 || accountIndex >= bankAccounts.Count)
+            {
+                Debug.Log("Invalid deposit amount or account.");
+                return;
+            }
+            
+            if (PlayerCash < amount)
+            {
+                Debug.Log("Insufficient cash for deposit.");
+                return;
+            }
+            
+            BankAccount account = bankAccounts[accountIndex];
+            
+            // For loan accounts, deposit pays down debt
+            if (account.isLoanAccount)
+            {
+                float paymentAmount = Mathf.Min(amount, account.balance);
+                account.balance -= paymentAmount;
+                if (account.balance < 0) account.balance = 0;
+                
+                // Deduct from player cash
+                RestaurantManager.Instance.AdjustMoney(-(int)paymentAmount);
+                
+                // Log transaction
+                string transaction = $"{DateTime.Now:MM/dd HH:mm} - Debt Payment: ${paymentAmount:N2} to {account.accountType}";
+                transactionHistory.Add(transaction);
+                
+                Debug.Log($"Debt payment of ${paymentAmount:N2} made to {account.accountType}");
+            }
+            else
+            {
+                // Normal deposit to savings/checking account
+                account.balance += amount;
+                account.lastUpdated = DateTime.Now;
+                
+                // Deduct from player cash
+                RestaurantManager.Instance.AdjustMoney(-(int)amount);
+                
+                // Log transaction
+                string transaction = $"{DateTime.Now:MM/dd HH:mm} - Deposit: ${amount:N2} to {account.accountType}";
+                transactionHistory.Add(transaction);
+                
+                Debug.Log($"Deposited ${amount:N2} to {account.accountType}");
+            }
+        }
+        
+        private void WithdrawFromAccount(int accountIndex, float amount)
+        {
+            if (amount <= 0 || accountIndex < 0 || accountIndex >= bankAccounts.Count)
+            {
+                Debug.Log("Invalid withdrawal amount or account.");
+                return;
+            }
+            
+            BankAccount account = bankAccounts[accountIndex];
+            
+            if (!account.CanWithdraw(amount))
+            {
+                if (account.isLoanAccount)
+                {
+                    Debug.Log($"Withdrawal would exceed credit limit. Available: ${account.GetAvailableCredit():N2}");
+                }
+                else
+                {
+                    Debug.Log($"Insufficient account balance. Available: ${account.balance:N2}");
+                }
+                return;
+            }
+            
+            if (account.isLoanAccount)
+            {
+                // For loan accounts, withdrawal increases debt
+                account.balance += amount;
+                account.lastUpdated = DateTime.Now;
+            }
+            else
+            {
+                // Normal withdrawal from savings/checking account
+                account.balance -= amount;
+                account.lastUpdated = DateTime.Now;
+            }
+            
+            // Add to player cash
+            RestaurantManager.Instance.AdjustMoney((int)amount);
+            
+            // Log transaction
+            string transaction = $"{DateTime.Now:MM/dd HH:mm} - Withdrawal: ${amount:N2} from {account.accountType}";
+            transactionHistory.Add(transaction);
+            
+            Debug.Log($"Withdrew ${amount:N2} from {account.accountType}");
+        }
+        
+        private void PayDebt(int accountIndex, float amount)
+        {
+            if (amount <= 0 || accountIndex < 0 || accountIndex >= bankAccounts.Count)
+            {
+                Debug.Log("Invalid payment amount or account.");
+                return;
+            }
+            
+            BankAccount account = bankAccounts[accountIndex];
+            
+            if (!account.isLoanAccount || account.balance <= 0)
+            {
+                Debug.Log("No debt to pay on this account.");
+                return;
+            }
+            
+            if (PlayerCash < amount)
+            {
+                Debug.Log("Insufficient cash for debt payment.");
+                return;
+            }
+            
+            // Calculate actual payment amount (can't pay more than owed)
+            float paymentAmount = Mathf.Min(amount, account.balance);
+            
+            // Reduce debt
+            account.balance -= paymentAmount;
+            if (account.balance < 0) account.balance = 0;
+            account.lastUpdated = DateTime.Now;
+            
+            // Deduct from player cash
+            RestaurantManager.Instance.AdjustMoney(-(int)paymentAmount);
+            
+            // Log transaction
+            string transaction = $"{DateTime.Now:MM/dd HH:mm} - Debt Payment: ${paymentAmount:N2} to {account.accountType}";
+            transactionHistory.Add(transaction);
+            
+            Debug.Log($"Debt payment of ${paymentAmount:N2} made to {account.accountType}");
+        }
+        
+        private void UpdateInterestRates()
+        {
+            // Simulate interest rate changes
+            foreach (var account in bankAccounts)
+            {
+                if (account.isLoanAccount)
+                {
+                    // Loan rates can fluctuate more
+                    float change = UnityEngine.Random.Range(-0.5f, 0.5f);
+                    account.interestRate = Mathf.Max(1.0f, account.interestRate + change);
+                }
+                else
+                {
+                    // Savings rates fluctuate less
+                    float change = UnityEngine.Random.Range(-0.2f, 0.2f);
+                    account.interestRate = Mathf.Max(0.01f, account.interestRate + change);
+                }
+            }
+            
+            // Log the rate update
+            string transaction = $"{DateTime.Now:MM/dd HH:mm} - Interest rates updated";
+            transactionHistory.Add(transaction);
+            
+            Debug.Log("Interest rates updated");
         }
     }
 }

@@ -51,6 +51,7 @@ namespace CryingSnow.FastFoodRush
         private GUIStyle gameButtonStyle;
         private GUIStyle scrollViewStyle;
         private GUIStyle headerStyle;
+        private bool stylesInitialized = false;
         
         // Scrolling
         private Vector2 scrollPosition = Vector2.zero;
@@ -62,10 +63,18 @@ namespace CryingSnow.FastFoodRush
         private CasinoGame selectedGame;
         
         // Betting
-        private float playerCash = 10000f;
         private float currentBet = 10f;
         private float totalWinnings = 0f;
         private float totalLosses = 0f;
+        
+        // Betting tracking and title system
+        private int totalBetsPlaced = 0;
+        private bool hasDegenerateGamblerTitle = false;
+        private float luckBonus = 0f; // Additional luck percentage
+        
+        // Property to access centralized money system
+        private long PlayerCash => RestaurantManager.Instance.GetMoney();
+        private string FormattedCash => RestaurantManager.Instance.GetFormattedMoney(PlayerCash);
         
         // Game state
         private enum CasinoView { Games, CurrentGame, History }
@@ -88,7 +97,7 @@ namespace CryingSnow.FastFoodRush
                 screenRect.height - 160 * scaleFactor
             );
             
-            SetupStyles();
+            // Note: SetupStyles() moved to DrawWindow() to avoid GUI access errors
             GenerateCasinoGames();
             betHistory = new List<BetHistory>();
         }
@@ -226,6 +235,13 @@ namespace CryingSnow.FastFoodRush
         
         public void DrawWindow()
         {
+            // Setup styles on first draw call (when GUI functions are available)
+            if (!stylesInitialized)
+            {
+                SetupStyles();
+                stylesInitialized = true;
+            }
+            
             // Update player count simulation
             UpdatePlayerCounts();
             
@@ -235,12 +251,12 @@ namespace CryingSnow.FastFoodRush
             // Draw header with navigation
             DrawHeader();
             
-            // Draw content based on current view
+            // Draw content based on current view - adjusted for taller header
             Rect contentRect = new Rect(
                 windowRect.x + 10 * scaleFactor,
-                windowRect.y + 80 * scaleFactor,
+                windowRect.y + 110 * scaleFactor,
                 windowRect.width - 20 * scaleFactor,
-                windowRect.height - 90 * scaleFactor
+                windowRect.height - 120 * scaleFactor
             );
             
             switch (currentView)
@@ -259,41 +275,81 @@ namespace CryingSnow.FastFoodRush
         
         private void DrawHeader()
         {
-            // Casino title and stats
+            // Casino title and stats - made taller for bigger text and moved buttons
             Rect headerRect = new Rect(windowRect.x + 10 * scaleFactor, windowRect.y + 10 * scaleFactor, 
-                                      windowRect.width - 20 * scaleFactor, 60 * scaleFactor);
+                                      windowRect.width - 20 * scaleFactor, 100 * scaleFactor);
             
             GUI.Label(new Rect(headerRect.x, headerRect.y, headerRect.width * 0.4f, 30 * scaleFactor), 
                      "🎰 VIRTUAL CASINO", headerStyle);
             
-            GUI.Label(new Rect(headerRect.x, headerRect.y + 30 * scaleFactor, headerRect.width * 0.4f, 20 * scaleFactor), 
-                     $"Cash: ${playerCash:F2}", labelStyle);
+            // Create bigger money text style
+            GUIStyle moneyStyle = headerStyle != null ? new GUIStyle(headerStyle) : new GUIStyle();
+            moneyStyle.fontSize = Mathf.RoundToInt(18 * scaleFactor); // Bigger than regular text
+            moneyStyle.normal.textColor = new Color(0f, 1f, 0f, 1f); // Bright green for money
             
-            // Navigation buttons
+            GUI.Label(new Rect(headerRect.x, headerRect.y + 30 * scaleFactor, headerRect.width * 0.6f, 25 * scaleFactor), 
+                     $"Cash: {FormattedCash}", moneyStyle);
+            
+            // Player stats and title
+            if (hasDegenerateGamblerTitle)
+            {
+                GUIStyle titleStyle = headerStyle != null ? new GUIStyle(headerStyle) : new GUIStyle();
+                titleStyle.normal.textColor = Color.yellow;
+                titleStyle.fontSize = Mathf.RoundToInt(16 * scaleFactor); // Bigger title text
+                titleStyle.fontStyle = FontStyle.Bold;
+                
+                GUI.Label(new Rect(headerRect.x, headerRect.y + 80 * scaleFactor, headerRect.width * 0.7f, 25 * scaleFactor), 
+                         "🏆 DEGENERATE GAMBLER 🍀 +25% LUCK", titleStyle);
+            }
+            
+            // Create bigger details text style
+            GUIStyle detailsStyle = labelStyle != null ? new GUIStyle(labelStyle) : new GUIStyle();
+            detailsStyle.fontSize = Mathf.RoundToInt(14 * scaleFactor); // Bigger than regular text
+            detailsStyle.fontStyle = FontStyle.Bold;
+            
+            GUI.Label(new Rect(headerRect.x, headerRect.y + 60 * scaleFactor, headerRect.width * 0.4f, 20 * scaleFactor), 
+                     $"Total Bets: {totalBetsPlaced} / 100", detailsStyle);
+            
+            // Navigation buttons - moved down lower in the header
             float buttonWidth = headerRect.width * 0.15f;
-            float buttonHeight = 25 * scaleFactor;
-            float buttonX = headerRect.x + headerRect.width - buttonWidth * 3 - 10 * scaleFactor;
+            float buttonHeight = 30 * scaleFactor; // Slightly taller buttons
+            float buttonX = headerRect.x + headerRect.width - buttonWidth * 2 - 10 * scaleFactor;
             
-            if (GUI.Button(new Rect(buttonX, headerRect.y + 5 * scaleFactor, buttonWidth, buttonHeight), "GAMES", buttonStyle))
+            if (GUI.Button(new Rect(buttonX, headerRect.y + 65 * scaleFactor, buttonWidth, buttonHeight), "GAMES", buttonStyle))
             {
                 currentView = CasinoView.Games;
                 scrollPosition = Vector2.zero;
             }
             
             buttonX += buttonWidth + 5 * scaleFactor;
-            if (GUI.Button(new Rect(buttonX, headerRect.y + 5 * scaleFactor, buttonWidth, buttonHeight), "HISTORY", buttonStyle))
+            if (GUI.Button(new Rect(buttonX, headerRect.y + 65 * scaleFactor, buttonWidth, buttonHeight), "HISTORY", buttonStyle))
             {
                 currentView = CasinoView.History;
                 historyScrollPosition = Vector2.zero;
             }
             
-            // Winnings/Losses stats
+            // Winnings/Losses stats with bigger text
+            GUIStyle statsStyle = detailsStyle != null ? new GUIStyle(detailsStyle) : new GUIStyle();
+            statsStyle.normal.textColor = new Color(1f, 1f, 0.7f, 1f); // Light yellow for stats
+            
             GUI.Label(new Rect(headerRect.x + headerRect.width * 0.5f, headerRect.y + 10 * scaleFactor, 
-                              headerRect.width * 0.3f, 20 * scaleFactor), 
-                     $"Total Won: ${totalWinnings:F2}", labelStyle);
-            GUI.Label(new Rect(headerRect.x + headerRect.width * 0.5f, headerRect.y + 30 * scaleFactor, 
-                              headerRect.width * 0.3f, 20 * scaleFactor), 
-                     $"Total Lost: ${totalLosses:F2}", labelStyle);
+                              headerRect.width * 0.4f, 22 * scaleFactor), 
+                     $"Total Won: ${totalWinnings:F2}", statsStyle);
+            GUI.Label(new Rect(headerRect.x + headerRect.width * 0.5f, headerRect.y + 35 * scaleFactor, 
+                              headerRect.width * 0.4f, 22 * scaleFactor), 
+                     $"Total Lost: ${totalLosses:F2}", statsStyle);
+            
+            // Show luck bonus if active
+            if (hasDegenerateGamblerTitle)
+            {
+                GUIStyle luckStyle = detailsStyle != null ? new GUIStyle(detailsStyle) : new GUIStyle();
+                luckStyle.normal.textColor = Color.green;
+                luckStyle.fontStyle = FontStyle.Bold;
+                
+                GUI.Label(new Rect(headerRect.x + headerRect.width * 0.5f, headerRect.y + 60 * scaleFactor, 
+                                  headerRect.width * 0.4f, 22 * scaleFactor), 
+                         $"Win Chance: +{luckBonus * 100:F0}%", luckStyle);
+            }
         }
         
         private void DrawGamesView(Rect contentRect)
@@ -369,9 +425,9 @@ namespace CryingSnow.FastFoodRush
                 selectedGame = null;
             }
             
-            // Betting interface
+            // Betting interface - made taller for better text visibility
             Rect bettingRect = new Rect(contentRect.x + 10 * scaleFactor, contentRect.y + 50 * scaleFactor, 
-                                       contentRect.width - 20 * scaleFactor, 200 * scaleFactor);
+                                       contentRect.width - 20 * scaleFactor, 250 * scaleFactor);
             GUI.Box(bettingRect, "", windowStyle);
             
             // Bet amount controls
@@ -406,11 +462,11 @@ namespace CryingSnow.FastFoodRush
             
             if (GUI.Button(new Rect(bettingRect.x + 250 * scaleFactor, buttonY, buttonWidth, buttonHeight), "MAX", buttonStyle))
             {
-                currentBet = Mathf.Min(selectedGame.maxBet, playerCash);
+                currentBet = Mathf.Min(selectedGame.maxBet, PlayerCash);
             }
             
             // Place bet button
-            GUI.enabled = !isGameInProgress && playerCash >= currentBet;
+            GUI.enabled = !isGameInProgress && PlayerCash >= currentBet;
             if (GUI.Button(new Rect(bettingRect.x + 10 * scaleFactor, bettingRect.y + 70 * scaleFactor, 
                                    150 * scaleFactor, 40 * scaleFactor), 
                           isGameInProgress ? "PLAYING..." : "PLACE BET", gameButtonStyle))
@@ -419,20 +475,21 @@ namespace CryingSnow.FastFoodRush
             }
             GUI.enabled = true;
             
-            // Game result
+            // Game result - positioned lower for better readability
             if (!string.IsNullOrEmpty(gameResult))
             {
-                GUIStyle resultStyle = new GUIStyle(headerStyle);
+                GUIStyle resultStyle = headerStyle != null ? new GUIStyle(headerStyle) : new GUIStyle();
                 resultStyle.normal.textColor = gameResult.Contains("WON") ? Color.green : Color.red;
+                resultStyle.alignment = TextAnchor.MiddleCenter; // Center the text for better visibility
                 
-                GUI.Label(new Rect(bettingRect.x + 10 * scaleFactor, bettingRect.y + 120 * scaleFactor, 
-                                  bettingRect.width - 20 * scaleFactor, 30 * scaleFactor), 
+                GUI.Label(new Rect(bettingRect.x + 10 * scaleFactor, bettingRect.y + 140 * scaleFactor, 
+                                  bettingRect.width - 20 * scaleFactor, 40 * scaleFactor), 
                          gameResult, resultStyle);
             }
             
-            // Game simulation display
-            DrawGameSimulation(new Rect(contentRect.x + 10 * scaleFactor, contentRect.y + 260 * scaleFactor, 
-                                       contentRect.width - 20 * scaleFactor, contentRect.height - 270 * scaleFactor));
+            // Game simulation display - adjusted position for larger betting box
+            DrawGameSimulation(new Rect(contentRect.x + 10 * scaleFactor, contentRect.y + 310 * scaleFactor, 
+                                       contentRect.width - 20 * scaleFactor, contentRect.height - 320 * scaleFactor));
         }
         
         private void DrawGameSimulation(Rect gameRect)
@@ -488,7 +545,7 @@ namespace CryingSnow.FastFoodRush
             Color numberColor = (number % 2 == 0) ? Color.red : Color.black;
             if (number == 0) numberColor = Color.green;
             
-            GUIStyle numberStyle = new GUIStyle(headerStyle);
+            GUIStyle numberStyle = headerStyle != null ? new GUIStyle(headerStyle) : new GUIStyle();
             numberStyle.normal.textColor = numberColor;
             
             GUI.Label(new Rect(rect.x + rect.width * 0.5f - 30 * scaleFactor, rect.y + 50 * scaleFactor, 
@@ -540,7 +597,7 @@ namespace CryingSnow.FastFoodRush
                                       betRect.width * 0.3f, 20 * scaleFactor), 
                              bet.timeStamp.ToString("MM/dd HH:mm"), labelStyle);
                     
-                    GUIStyle resultStyle = new GUIStyle(labelStyle);
+                    GUIStyle resultStyle = labelStyle != null ? new GUIStyle(labelStyle) : new GUIStyle();
                     resultStyle.normal.textColor = bet.GetResultColor();
                     
                     GUI.Label(new Rect(betRect.x + betRect.width * 0.4f, betRect.y + 15 * scaleFactor, 
@@ -556,7 +613,10 @@ namespace CryingSnow.FastFoodRush
         
         private void PlaceBet()
         {
-            if (playerCash < currentBet) return;
+            if (PlayerCash < currentBet) return;
+            
+            // Deduct bet amount immediately when placing bet
+            RestaurantManager.Instance.AdjustMoney(-(int)currentBet);
             
             isGameInProgress = true;
             lastGameTime = Time.time;
@@ -569,9 +629,16 @@ namespace CryingSnow.FastFoodRush
         {
             if (selectedGame == null) return;
             
-            // Calculate win probability based on house edge
-            float winProbability = (100f - selectedGame.houseEdge) / 100f;
-            bool isWin = UnityEngine.Random.Range(0f, 1f) < winProbability;
+            // Track betting for title system
+            totalBetsPlaced++;
+            CheckForDegenerateGamblerTitle();
+            
+            // Calculate REALISTIC win probability based on house edge
+            // House edge represents casino advantage, so player win rate should be roughly 50% minus house edge
+            float baseWinProbability = GetBaseWinProbability(selectedGame.name);
+            float finalWinProbability = baseWinProbability + luckBonus;
+            
+            bool isWin = UnityEngine.Random.Range(0f, 1f) < finalWinProbability;
             
             BetHistory newBet = new BetHistory
             {
@@ -586,9 +653,11 @@ namespace CryingSnow.FastFoodRush
                 // Calculate winnings based on game type
                 float multiplier = GetWinMultiplier(selectedGame.name);
                 newBet.winAmount = currentBet * multiplier;
-                playerCash += newBet.winAmount;
+                RestaurantManager.Instance.AdjustMoney((int)newBet.winAmount);
                 totalWinnings += newBet.winAmount;
-                gameResult = $"🎉 YOU WON ${newBet.winAmount:F2}! 🎉";
+                
+                string titleBonus = hasDegenerateGamblerTitle ? " 🍀 LUCK BONUS!" : "";
+                gameResult = $"🎉 YOU WON ${newBet.winAmount:F2}!{titleBonus} 🎉";
                 
                 // Auto bank in winnings
                 AutoBankWinnings(newBet.winAmount);
@@ -596,7 +665,7 @@ namespace CryingSnow.FastFoodRush
             else
             {
                 newBet.winAmount = 0f;
-                playerCash -= currentBet;
+                // No need to deduct money here - already deducted when bet was placed
                 totalLosses += currentBet;
                 gameResult = $"😞 You lost ${currentBet:F2}. Better luck next time!";
             }
@@ -605,19 +674,40 @@ namespace CryingSnow.FastFoodRush
             isGameInProgress = false;
         }
         
+        private float GetBaseWinProbability(string gameName)
+        {
+            // Consistent 9:20 ratio (45% win rate) for balanced gameplay
+            return 0.45f; // 9 wins out of 20 attempts for all games
+        }
+        
         private float GetWinMultiplier(string gameName)
         {
             switch (gameName)
             {
-                case "Slots": return UnityEngine.Random.Range(1.5f, 50f);
-                case "Roulette": return 35f; // Single number bet
-                case "Blackjack": return 2f;
+                case "Slots": return UnityEngine.Random.Range(2f, 100f); // Higher since lower win rate
+                case "Roulette": return UnityEngine.Random.Range(2f, 36f); // Varies by bet type
+                case "Blackjack": return 2f; // Standard 2:1
                 case "Poker": return UnityEngine.Random.Range(2f, 10f);
                 case "Baccarat": return 1.95f;
-                case "Craps": return 2f;
+                case "Craps": return UnityEngine.Random.Range(2f, 30f); // Varies by bet
                 case "Sports Betting": return UnityEngine.Random.Range(1.5f, 8f);
-                case "Lottery": return UnityEngine.Random.Range(10f, 1000f);
+                case "Lottery": return UnityEngine.Random.Range(50f, 10000f); // Massive payouts
                 default: return 2f;
+            }
+        }
+        
+        private void CheckForDegenerateGamblerTitle()
+        {
+            if (!hasDegenerateGamblerTitle && totalBetsPlaced >= 100)
+            {
+                hasDegenerateGamblerTitle = true;
+                luckBonus = 0.25f; // 25% luck bonus
+                
+                gameResult = "🎰🏆 TITLE UNLOCKED: DEGENERATE GAMBLER! 🏆🎰\n" +
+                           "🍀 +25% LUCK BONUS APPLIED! 🍀\n" +
+                           $"You've placed {totalBetsPlaced} bets!";
+                
+                Debug.Log($"Player earned Degenerate Gambler title after {totalBetsPlaced} bets!");
             }
         }
         

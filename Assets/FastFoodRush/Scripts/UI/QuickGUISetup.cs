@@ -12,7 +12,7 @@ namespace CryingSnow.FastFoodRush
         [SerializeField] private bool setupOnStart = true;
         [SerializeField] private KeyCode toggleKey = KeyCode.G; // Press G to toggle GUI
         
-        private LegacyGUIController guiController;
+        private SimpleLegacyGUI simpleLegacyGUI;
         private bool guiEnabled = false;
         
         void Start()
@@ -42,28 +42,28 @@ namespace CryingSnow.FastFoodRush
         [ContextMenu("Enable Legacy GUI")]
         public void EnableLegacyGUI()
         {
-            if (guiController == null)
+            if (simpleLegacyGUI == null)
             {
                 // Find existing controller or create new one
-                guiController = FindObjectOfType<LegacyGUIController>();
+                simpleLegacyGUI = FindObjectOfType<SimpleLegacyGUI>();
                 
-                if (guiController == null)
+                if (simpleLegacyGUI == null)
                 {
-                    // Create new GameObject with the GUI controller
-                    GameObject guiObject = new GameObject("LegacyGUIController");
-                    guiController = guiObject.AddComponent<LegacyGUIController>();
+                    // Create new GameObject with the Simple Legacy GUI
+                    GameObject guiObject = new GameObject("SimpleLegacyGUI");
+                    simpleLegacyGUI = guiObject.AddComponent<SimpleLegacyGUI>();
                     
-                    Debug.Log("✅ Legacy GUI has been enabled!");
+                    Debug.Log("✅ Simple Legacy GUI has been enabled!");
                     Debug.Log("💰 Click FINANCE button for banking and investments");
                     Debug.Log("🤝 Click DEALER button for business management");
                     Debug.Log("🎰 Click CASINO button for gambling games");
-                    Debug.Log($"🎮 Press '{toggleKey}' key to toggle GUI on/off");
+                    Debug.Log($"🎮 Press 'Tab' key to toggle GUI on/off");
                 }
             }
             
-            if (guiController != null)
+            if (simpleLegacyGUI != null)
             {
-                guiController.gameObject.SetActive(true);
+                simpleLegacyGUI.gameObject.SetActive(true);
                 guiEnabled = true;
             }
         }
@@ -71,26 +71,26 @@ namespace CryingSnow.FastFoodRush
         [ContextMenu("Disable Legacy GUI")]
         public void DisableLegacyGUI()
         {
-            if (guiController != null)
+            if (simpleLegacyGUI != null)
             {
-                guiController.gameObject.SetActive(false);
+                simpleLegacyGUI.gameObject.SetActive(false);
                 guiEnabled = false;
-                Debug.Log("Legacy GUI disabled");
+                Debug.Log("Simple Legacy GUI disabled");
             }
         }
         
         void OnGUI()
         {
             // Show help text in the corner
-            if (guiEnabled && guiController != null)
+            if (guiEnabled && simpleLegacyGUI != null)
             {
                 GUI.Label(new Rect(10, Screen.height - 60, 300, 40), 
-                         $"Legacy GUI Active - Press '{toggleKey}' to toggle");
+                         $"Simple Legacy GUI Active - Press '{toggleKey}' to toggle");
             }
             else
             {
                 GUI.Label(new Rect(10, Screen.height - 40, 300, 20), 
-                         $"Press '{toggleKey}' to enable Legacy GUI");
+                         $"Press '{toggleKey}' to enable Simple Legacy GUI");
             }
         }
     }

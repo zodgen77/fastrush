@@ -26,17 +26,22 @@ namespace CryingSnow.FastFoodRush
         // Simple GUI styles
         private GUIStyle buttonStyle;
         private GUIStyle windowStyle;
+        private GUIStyle labelStyle;
+        private GUIStyle shadowStyle;
         private bool stylesInitialized = false;
+        private bool componentsInitialized = false;
         
         void Start()
         {
             Debug.Log("=== Simple Legacy GUI Started ===");
-            InitializeComponents();
+            // Note: Component initialization moved to OnGUI to avoid GUI access errors
         }
         
         void InitializeComponents()
         {
-            // Create window components
+            if (componentsInitialized) return;
+            
+            // Create window components - this will be called from OnGUI
             if (financeWindow == null)
             {
                 GameObject financeGO = new GameObject("FinanceWindow");
@@ -61,6 +66,7 @@ namespace CryingSnow.FastFoodRush
                 casinoWindow.Initialize(new Rect(0, 0, Screen.width, Screen.height), 1f);
             }
             
+            componentsInitialized = true;
             Debug.Log("✅ All window components created");
         }
         
@@ -68,16 +74,52 @@ namespace CryingSnow.FastFoodRush
         {
             if (stylesInitialized) return;
             
-            // Simple button style
-            buttonStyle = new GUIStyle(GUI.skin.button);
-            buttonStyle.fontSize = 16;
-            buttonStyle.fontStyle = FontStyle.Bold;
-            
-            // Simple window style
-            windowStyle = new GUIStyle(GUI.skin.window);
-            windowStyle.fontSize = 14;
-            
-            stylesInitialized = true;
+            try
+            {
+                // Calculate responsive font sizes based on screen resolution
+                int baseFontSize = Mathf.Max(12, Screen.width / 80); // Minimum 12, scales with screen width
+                int buttonFontSize = Mathf.Max(16, Screen.width / 60); // Larger for buttons
+                int labelFontSize = Mathf.Max(14, Screen.width / 70); // Medium for labels
+                
+                // Enhanced button style with better readability
+                buttonStyle = new GUIStyle(GUI.skin.button);
+                buttonStyle.fontSize = buttonFontSize;
+                buttonStyle.fontStyle = FontStyle.Bold;
+                buttonStyle.normal.textColor = Color.white;
+                buttonStyle.hover.textColor = Color.yellow;
+                buttonStyle.active.textColor = Color.cyan;
+                buttonStyle.alignment = TextAnchor.MiddleCenter;
+                
+                // Enhanced window style
+                windowStyle = new GUIStyle(GUI.skin.window);
+                windowStyle.fontSize = baseFontSize;
+                windowStyle.fontStyle = FontStyle.Bold;
+                windowStyle.normal.textColor = Color.white;
+                
+                // Enhanced label style with better contrast
+                labelStyle = new GUIStyle(GUI.skin.label);
+                labelStyle.fontSize = labelFontSize;
+                labelStyle.fontStyle = FontStyle.Bold;
+                labelStyle.normal.textColor = Color.white;
+                labelStyle.alignment = TextAnchor.MiddleLeft;
+                
+                // Shadow style for text outline effect
+                shadowStyle = new GUIStyle(labelStyle);
+                shadowStyle.normal.textColor = Color.black;
+                
+                stylesInitialized = true;
+                Debug.Log("SimpleLegacyGUI: Enhanced styles initialized successfully");
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"SimpleLegacyGUI: Failed to initialize styles - {e.Message}");
+                // Create fallback styles
+                buttonStyle = new GUIStyle();
+                windowStyle = new GUIStyle();
+                labelStyle = new GUIStyle();
+                shadowStyle = new GUIStyle();
+                stylesInitialized = true;
+            }
         }
         
         void Update()
@@ -98,10 +140,16 @@ namespace CryingSnow.FastFoodRush
         {
             if (!showGUI) return;
             
+            // Initialize components on first OnGUI call (when GUI functions are available)
+            if (!componentsInitialized)
+            {
+                InitializeComponents();
+            }
+            
             InitializeStyles();
             
             // Always draw a test label to confirm OnGUI is working
-            GUI.Label(new Rect(10, 10, 300, 20), "Simple Legacy GUI Active");
+            DrawLabelWithShadow(new Rect(10, 10, 400, 30), "Simple Legacy GUI Active");
             
             if (showBackground)
             {
@@ -123,9 +171,9 @@ namespace CryingSnow.FastFoodRush
         
         void DrawMainButtons()
         {
-            // Simple button layout at bottom of screen
-            float buttonHeight = 50;
-            float buttonWidth = 150;
+            // Responsive button layout at bottom of screen
+            float buttonHeight = Mathf.Max(50, Screen.height / 15); // Responsive height
+            float buttonWidth = Mathf.Max(150, Screen.width / 8); // Responsive width
             float spacing = 10;
             float totalWidth = (buttonWidth * 3) + (spacing * 2);
             float startX = (Screen.width - totalWidth) / 2f;
@@ -154,10 +202,27 @@ namespace CryingSnow.FastFoodRush
                 Debug.Log("Casino button clicked!");
             }
             
-            // Status display
-            GUI.Label(new Rect(10, 40, 200, 20), $"Cash: $10,000");
-            GUI.Label(new Rect(10, 60, 200, 20), $"Window: {currentWindow}");
-            GUI.Label(new Rect(10, 80, 300, 20), $"Press {toggleKey} to toggle GUI");
+            // Status display with improved readability
+            float labelHeight = Mathf.Max(25, Screen.height / 30);
+            string cashDisplay = RestaurantManager.Instance != null ? 
+                $"Cash: {RestaurantManager.Instance.GetFormattedMoney(RestaurantManager.Instance.GetMoney())}" : 
+                "Cash: $0";
+            DrawLabelWithShadow(new Rect(10, 40, 300, labelHeight), cashDisplay);
+            DrawLabelWithShadow(new Rect(10, 40 + labelHeight + 5, 300, labelHeight), $"Window: {currentWindow}");
+            DrawLabelWithShadow(new Rect(10, 40 + (labelHeight + 5) * 2, 400, labelHeight), $"Press {toggleKey} to toggle GUI");
+        }
+        
+        /// <summary>
+        /// Draw text with shadow for better readability
+        /// </summary>
+        void DrawLabelWithShadow(Rect rect, string text)
+        {
+            // Draw shadow slightly offset
+            Rect shadowRect = new Rect(rect.x + 2, rect.y + 2, rect.width, rect.height);
+            GUI.Label(shadowRect, text, shadowStyle);
+            
+            // Draw main text
+            GUI.Label(rect, text, labelStyle);
         }
         
         void DrawActiveWindow()

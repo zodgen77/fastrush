@@ -219,8 +219,10 @@ namespace CryingSnow.FastFoodRush
             
             GUI.Box(statusRect, "", windowStyle);
             
-            // Draw cash amount (this would be connected to your game's economy system)
-            string cashText = "Cash: $" + GetPlayerCash().ToString("N0");
+            // Draw cash amount using centralized money system with proper formatting
+            string cashText = RestaurantManager.Instance != null ? 
+                $"Cash: {RestaurantManager.Instance.GetFormattedMoney(RestaurantManager.Instance.GetMoney())}" : 
+                "Cash: $0";
             GUI.Label(new Rect(statusRect.x + 10 * scaleFactor, statusRect.y + 10 * scaleFactor, 
                               statusRect.width - 20 * scaleFactor, 20 * scaleFactor), cashText, labelStyle);
         }
@@ -276,10 +278,10 @@ namespace CryingSnow.FastFoodRush
             Debug.Log("Closing window");
         }
         
-        // This would connect to your game's economy system
+        // Connected to the centralized money system
         private float GetPlayerCash()
         {
-            return 10000f; // Placeholder value
+            return RestaurantManager.Instance != null ? RestaurantManager.Instance.GetMoney() : 0f;
         }
         
         // Public methods for external access
